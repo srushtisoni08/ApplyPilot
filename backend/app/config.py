@@ -26,5 +26,7 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     OLOSTEP_API_KEY: str = ""
     CRUSTDATA_API_KEY: str = ""
+    TESSERACT_CMD: str = ""
+    TESSDATA_PREFIX: str = ""
 
 settings = Settings()

@@ -6,10 +6,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.models.db import engine
 from app.routes import auth
 from app.services.object_storage import check_object_storage
+from app.routes import documents
 
 app = FastAPI()
 app.include_router(auth.router)
-
+app.include_router(documents.router)
 
 @app.get("/health")
 def health() -> dict[str, object]:
