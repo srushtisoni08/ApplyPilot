@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "build": "python -m compileall -q backend\\app"
+  },
+  "dependencies": {
+    "@neon/config": "^1.14.6",
+    "@neon/env": "^2.1.9"
+  }
+}
