@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/callback"
+    FRONTEND_URL: str = "http://localhost:5173"
     LLM_API_KEY: str = ""
     OLOSTEP_API_KEY: str = ""
     CRUSTDATA_API_KEY: str = ""

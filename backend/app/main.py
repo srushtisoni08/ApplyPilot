@@ -4,9 +4,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models.db import engine
+from app.routes import auth
 from app.services.object_storage import check_object_storage
 
 app = FastAPI()
+app.include_router(auth.router)
 
 
 @app.get("/health")
