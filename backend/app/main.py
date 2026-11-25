@@ -10,6 +10,7 @@ from app.routes import documents
 from app.routes import profile
 from app.routes import matches
 from app.routes import applications
+from app.routes import apply, dummy
 
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
@@ -26,6 +27,8 @@ app.include_router(documents.router)
 app.include_router(profile.router)
 app.include_router(matches.router)
 app.include_router(applications.router)
+app.include_router(apply.router)
+app.include_router(dummy.router)
 
 @app.get("/health")
 def health() -> dict[str, object]:

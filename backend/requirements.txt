@@ -20,3 +20,4 @@ python-multipart
 google-genai
 numpy
 reportlab
+playwright

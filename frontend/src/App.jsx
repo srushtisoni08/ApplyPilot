@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import ConnectScreen from "./components/ConnectScreen";
 import Nav from "./components/Nav";
+import Applications from "./pages/Applications";
 import Approvals from "./pages/Approvals";
 import Opportunities from "./pages/Opportunities";
 import Profile from "./pages/Profile";
@@ -40,6 +41,9 @@ export default function App() {
           <Opportunities userId={userId} onPrepared={() => setTab("approvals")} />
         )}
         {tab === "approvals" && <Approvals userId={userId} />}
+        {tab === "applications" && (
+          <Applications userId={userId} onFilled={() => setTab("approvals")} />
+        )}
       </main>
     </div>
   );

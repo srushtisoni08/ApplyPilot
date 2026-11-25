@@ -33,5 +33,6 @@ class Settings(BaseSettings):
     CRUSTDATA_API_KEY: str = ""
     TESSERACT_CMD: str = ""
     TESSDATA_PREFIX: str = ""
-
+    PLAYWRIGHT_BROWSERS_PATH: str = ""
+    
 settings = Settings()

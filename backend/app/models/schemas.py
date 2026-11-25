@@ -68,3 +68,12 @@ class CoverLetter(BaseModel):
 
 class FactCheck(BaseModel):
     unsupported_claims: list[str] = []
+
+class FieldMap(BaseModel):
+    key: str
+    source: str = "none"       # name/email/phone/location/cgpa/grad_year/degree/institution/field_of_study/skills/cover_letter/resume/none
+    option: str | None = None  # for <select>: exact option text, else null
+
+
+class FormMapping(BaseModel):
+    fields: list[FieldMap] = []

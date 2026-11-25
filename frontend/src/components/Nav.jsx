@@ -1,6 +1,7 @@
 const TABS = [
   ["opportunities", "Opportunities"],
   ["approvals", "Approvals"],
+  ["applications", "Applications"],
   ["profile", "Profile"],
 ];
 

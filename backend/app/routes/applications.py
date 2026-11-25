@@ -11,6 +11,7 @@ from app.models.db import get_db
 from app.models.tables import Application, Approval, CandidateProfile, Match, Opportunity
 from app.services.audit import audit
 from app.services.writer import OUT_DIR, generate
+from app.services.apply import submit_application
 
 router = APIRouter(tags=["applications"])
 LOCKED = ("submitted", "interview", "rejected")
@@ -83,6 +84,7 @@ def pending_approvals(user_id: int, db: Session = Depends(get_db)):
             "approval_id": a.id, "kind": a.kind, "application_id": app.id,
             "company": o.company, "role": o.role, "cover_letter": app.cover_letter,
             "selected": a.payload.get("selected"), "fact_check": a.payload.get("fact_check"),
+            "preview": a.payload.get("preview"),
         }
         for a, app, o in rows
     ]
@@ -108,9 +110,32 @@ def decide(approval_id: int, body: Decision, db: Session = Depends(get_db)):
     opp = db.get(Opportunity, app.opportunity_id)
     if a.kind == "resume":
         app.status = "ready" if body.decision == "approved" else "draft"
+    elif a.kind == "submission":
+        if body.decision == "rejected":
+            app.status = "ready"
+        elif app.status != "awaiting_submit" or app.reference_number:
+            raise HTTPException(400, f"Cannot submit while status is '{app.status}'")
+        else:
+            app.status = "submitting"  # blocks double submit
     audit(db, opp.user_id, "approval.decide", {"approval_id": a.id, "kind": a.kind},
           {"decision": body.decision}, approved_by="user")
     db.commit()
+
+    if a.kind == "submission" and body.decision == "approved":
+        # GATE 2 passed: only now does the browser touch the real submit button
+        try:
+            r = submit_application(app, opp, a.payload["plan"])
+            app.reference_number = r["reference"]
+            app.status = "submitted" if r["verified"] else "needs_attention"
+            if r["verified"]:
+                app.submitted_at = datetime.now()
+            audit(db, opp.user_id, "apply.submit", {"application_id": app.id},
+                  {"verified": r["verified"], "reference": r["reference"]}, approved_by="user")
+        except Exception as exc:
+            app.status = "needs_attention"
+            audit(db, opp.user_id, "apply.submit", {"application_id": app.id},
+                  {"error": str(exc)[:200]}, approved_by="user", status="error")
+        db.commit()
     return {"decision": a.decision, "application_status": app.status}
 
 

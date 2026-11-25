@@ -39,4 +39,7 @@ export const api = {
   decide: (approvalId, decision) =>
     req(`/approvals/${approvalId}/decide`, json("POST", { decision })),
   fileUrl: (appId, ext) => `${BASE}/applications/${appId}/file/${ext}`,
+  applications: (id) => req(`/applications/list/${id}`),
+  fill: (appId, watch) => req(`/applications/${appId}/fill?watch=${watch}`, { method: "POST" }),
+  screenshotUrl: (appId, kind = "filled") => `${BASE}/applications/${appId}/screenshot?kind=${kind}`,
 };
