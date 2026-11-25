@@ -18,3 +18,4 @@ pytesseract
 pillow 
 python-multipart
 google-genai
+numpy

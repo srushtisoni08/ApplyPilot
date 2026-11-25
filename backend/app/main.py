@@ -8,11 +8,22 @@ from app.routes import auth
 from app.services.object_storage import check_object_storage
 from app.routes import documents
 from app.routes import profile
+from app.routes import matches
+
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_URL, "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(profile.router)
+app.include_router(matches.router)
 
 @app.get("/health")
 def health() -> dict[str, object]:
