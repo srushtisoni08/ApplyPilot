@@ -38,3 +38,17 @@ def get_doc(doc_id: int, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(404, "Not found")
     return {"id": doc.id, "filename": doc.filename, "file_type": doc.file_type, "text": doc.extracted_text}
+
+@router.delete("/{doc_id}")
+def delete_doc(doc_id: int, db: Session = Depends(get_db)):
+    doc = db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(404, "Not found")
+    db.delete(doc)
+    db.commit()
+    return {"deleted": doc_id}
+
+@router.get("")
+def list_docs(user_id: int, db: Session = Depends(get_db)):
+    docs = db.query(Document).filter(Document.user_id == user_id).order_by(Document.id).all()
+    return [{"id": d.id, "filename": d.filename, "file_type": d.file_type, "chars": len(d.extracted_text or "")} for d in docs]

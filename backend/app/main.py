@@ -7,10 +7,12 @@ from app.models.db import engine
 from app.routes import auth
 from app.services.object_storage import check_object_storage
 from app.routes import documents
+from app.routes import profile
 
 app = FastAPI()
 app.include_router(auth.router)
 app.include_router(documents.router)
+app.include_router(profile.router)
 
 @app.get("/health")
 def health() -> dict[str, object]:
