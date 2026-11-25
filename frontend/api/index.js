@@ -34,4 +34,9 @@ export const api = {
   runMatching: (id, force = false) =>
     req(`/matches/run/${id}?force=${force}`, { method: "POST" }),
   matches: (id) => req(`/matches/${id}`),
+  startApplication: (oppId) => req(`/applications/start/${oppId}`, { method: "POST" }),
+  approvals: (id) => req(`/approvals/${id}`),
+  decide: (approvalId, decision) =>
+    req(`/approvals/${approvalId}/decide`, json("POST", { decision })),
+  fileUrl: (appId, ext) => `${BASE}/applications/${appId}/file/${ext}`,
 };

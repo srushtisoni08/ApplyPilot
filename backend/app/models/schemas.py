@@ -55,3 +55,16 @@ class OpportunityData(BaseModel):
 class EmailCheck(BaseModel):
     is_opportunity: bool
     reason: str
+
+class Selection(BaseModel):
+    skill_indices: list[int] = []
+    project_indices: list[int] = []
+    experience_indices: list[int] = []
+
+
+class CoverLetter(BaseModel):
+    body: str
+
+
+class FactCheck(BaseModel):
+    unsupported_claims: list[str] = []

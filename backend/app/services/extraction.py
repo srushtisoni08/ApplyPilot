@@ -74,6 +74,9 @@ def process_emails(db: Session, user: User, n: int = 20) -> dict:
                 continue
 
             o = extract(OpportunityData, text, "Extract the job/internship opportunity details. deadline must be YYYY-MM-DD.")
+            if not o.company and not o.role:  # job-alert digest, not one real opportunity
+                stats["not_opportunity"] += 1
+                continue
             try:
                 deadline = date.fromisoformat(o.deadline) if o.deadline else None
             except ValueError:

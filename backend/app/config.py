@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "gemini-3.5-flash-lite"
+    LLM_FALLBACK_MODEL: str = "gemini-3.8-flash"
     LLM_PROVIDER: str = "gemini"  # "gemini" or "groq"
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api } from "./api";
+﻿import { useEffect, useState } from "react";
+import { api } from "../api";
 
 const TAG = {
   suitable: "bg-green-100 text-green-800",
@@ -7,7 +7,7 @@ const TAG = {
   uncertain: "bg-yellow-100 text-yellow-800",
 };
 
-export default function Opportunities({ userId }) {
+export default function Opportunities({ userId, onPrepared }) {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(null);
   const [busy, setBusy] = useState("");
@@ -36,6 +36,18 @@ export default function Opportunities({ userId }) {
           (s.errors?.length || m.errors?.length ? " Some items failed, check the backend terminal." : "") +
           (m.profile_confirmed === false ? " Note: your profile is not confirmed yet." : "")
       );
+    } catch (e) {
+      setMsg("Error: " + e.message);
+    }
+    setBusy("");
+  };
+
+  const prepare = async (oppId) => {
+    setBusy("Preparing resume and cover letter (about 20s)...");
+    setMsg("");
+    try {
+      await api.startApplication(oppId);
+      onPrepared?.();
     } catch (e) {
       setMsg("Error: " + e.message);
     }
@@ -81,18 +93,24 @@ export default function Opportunities({ userId }) {
               </div>
             </button>
             {open === o.opportunity_id && (
-              <div className="border-t px-4 py-3 text-sm space-y-2">
+              <div className="border-t px-4 py-3 text-sm space-y-3">
                 <p>{o.explanation}</p>
-                {o.apply_link && (
-                  <a
-                    href={o.apply_link}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 underline"
-                  >
-                    Open application link
-                  </a>
-                )}
+                <div className="flex items-center gap-4">
+                  {o.category !== "unsuitable" && (
+                    <button
+                      onClick={() => prepare(o.opportunity_id)}
+                      disabled={!!busy}
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-white disabled:opacity-50"
+                    >
+                      Prepare application
+                    </button>
+                  )}
+                  {o.apply_link && (
+                    <a href={o.apply_link} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                      Open application link
+                    </a>
+                  )}
+                </div>
               </div>
             )}
           </div>
