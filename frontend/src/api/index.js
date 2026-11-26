@@ -48,6 +48,7 @@ export const api = {
     req(`/approvals/${approvalId}/decide`, json("POST", { decision })),
   fileUrl: (appId, ext) => `${BASE}/applications/${appId}/file/${ext}`,
   applications: (id) => req(`/applications/list/${id}`),
+  deleteApplication: (appId) => req(`/applications/${appId}`, { method: "DELETE" }),
   fill: (appId, watch) => req(`/applications/${appId}/fill?watch=${watch}`, { method: "POST" }),
   screenshotUrl: (appId, kind = "filled") => `${BASE}/applications/${appId}/screenshot?kind=${kind}`,
   markApplied: (appId) => req(`/applications/${appId}/mark-applied`, { method: "POST" }),

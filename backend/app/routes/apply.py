@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -35,6 +35,52 @@ def list_applications(
          "apply_method": classify_apply_target(o.apply_link)["method"]}
         for a, o in rows
     ]
+
+
+@router.delete("/applications/{app_id}")
+def delete_application(
+    app_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    app = db.get(Application, app_id)
+    if not app:
+        raise HTTPException(404, "Application not found")
+    opp = db.get(Opportunity, app.opportunity_id)
+    if not opp or opp.user_id != current_user.id:
+        raise HTTPException(404, "Application not found")
+    if app.status == "submitting":
+        raise HTTPException(409, "Cannot delete while a submission is in progress")
+
+    application_id = app.id
+    status = app.status
+    audit(
+        db,
+        opp.user_id,
+        "application.delete",
+        {"application_id": application_id},
+        {"previous_status": status},
+        approved_by="user",
+    )
+    db.execute(delete(Approval).where(Approval.application_id == application_id))
+    db.delete(app)
+    db.commit()
+
+    cleanup_warnings = []
+    for path in (
+        OUT_DIR / f"app_{application_id}.pdf",
+        OUT_DIR / f"app_{application_id}.docx",
+        OUT_DIR / f"app_{application_id}_filled.png",
+        OUT_DIR / f"app_{application_id}_done.png",
+    ):
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            cleanup_warnings.append(path.name)
+
+    return {"deleted": True, "cleanup_warnings": cleanup_warnings}
 
 
 @router.post("/applications/{app_id}/fill")
