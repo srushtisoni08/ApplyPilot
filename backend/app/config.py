@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/callback"
     FRONTEND_URL: str = "http://localhost:5173"
+    AUTH_SECRET_KEY: str = ""
+    AUTH_COOKIE_SECURE: bool | None = None
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "gemini-3.5-flash-lite"
     LLM_FALLBACK_MODEL: str = "gemini-3.8-flash"

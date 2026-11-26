@@ -5,22 +5,28 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.models.db import get_db
-from app.models.tables import Application, Approval, CandidateProfile, Opportunity
+from app.models.tables import Application, Approval, CandidateProfile, Opportunity, User
 from app.services.apply import fill_application
 from app.services.apply_target import classify_apply_target
 from app.services.email_apply import prepare_email
 from app.services.audit import audit
 from app.services.writer import OUT_DIR
+from app.security import get_current_user, require_owner
 
 router = APIRouter(tags=["apply"])
 
 
 @router.get("/applications/list/{user_id}")
-def list_applications(user_id: int, db: Session = Depends(get_db)):
+def list_applications(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_owner(user_id, current_user)
     rows = db.execute(
         select(Application, Opportunity)
         .join(Opportunity, Application.opportunity_id == Opportunity.id)
-        .where(Opportunity.user_id == user_id)
+        .where(Opportunity.user_id == current_user.id)
         .order_by(Application.id.desc())
     ).all()
     return [
@@ -32,13 +38,20 @@ def list_applications(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/applications/{app_id}/fill")
-def fill(app_id: int, watch: bool = False, db: Session = Depends(get_db)):
+def fill(
+    app_id: int,
+    watch: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     app = db.get(Application, app_id)
     if not app:
         raise HTTPException(404, "Application not found")
+    opp = db.get(Opportunity, app.opportunity_id)
+    if not opp or opp.user_id != current_user.id:
+        raise HTTPException(404, "Application not found")
     if app.status not in ("ready", "needs_attention", "awaiting_submit") or not app.resume_file:
         raise HTTPException(400, f"Status is '{app.status}'. Approve the resume first.")
-    opp = db.get(Opportunity, app.opportunity_id)
     target = classify_apply_target(opp.apply_link)
     if target["method"] == "none":
         raise HTTPException(400, f"{target['reason']} Apply manually using the original email.")
@@ -94,23 +107,38 @@ def fill(app_id: int, watch: bool = False, db: Session = Depends(get_db)):
 
 
 @router.get("/applications/{app_id}/screenshot")
-def screenshot(app_id: int, kind: str = "filled"):
+def screenshot(
+    app_id: int,
+    kind: str = "filled",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    app = db.get(Application, app_id)
+    opp = db.get(Opportunity, app.opportunity_id) if app else None
+    if not opp or opp.user_id != current_user.id:
+        raise HTTPException(404, "Screenshot not found")
     path = OUT_DIR / f"app_{app_id}_{'done' if kind == 'done' else 'filled'}.png"
     if not path.exists():
         raise HTTPException(404, "No screenshot")
     return FileResponse(path, media_type="image/png")
 
 @router.post("/applications/{app_id}/mark-applied")
-def mark_applied(app_id: int, db: Session = Depends(get_db)):
+def mark_applied(
+    app_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """User applied by themselves outside ApplyPilot. Lets reply and deadline tracking work for it."""
     app = db.get(Application, app_id)
     if not app:
+        raise HTTPException(404, "Application not found")
+    opp = db.get(Opportunity, app.opportunity_id)
+    if not opp or opp.user_id != current_user.id:
         raise HTTPException(404, "Application not found")
     if app.status in ("submitted", "interview", "offer", "rejected"):
         raise HTTPException(400, f"Already '{app.status}'")
     if app.status == "submitting":
         raise HTTPException(400, "A submission is in progress. Wait for it to finish.")
-    opp = db.get(Opportunity, app.opportunity_id)
     for old in db.scalars(select(Approval).where(
             Approval.application_id == app.id, Approval.decision == "pending")):
         old.decision = "superseded"  # nothing left to approve

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.db import get_db
 from app.models.tables import Opportunity, User
 from app.services.matching import run_matching
+from app.security import get_current_user, require_owner
 
 router = APIRouter(prefix="/dummy", tags=["dummy"])
 
@@ -51,12 +52,15 @@ async def submit(
 
 
 @router.post("/create-opportunity/{user_id}")
-def create_opportunity(user_id: int, db: Session = Depends(get_db)):
+def create_opportunity(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Adds a Demo Corp opportunity that points at the dummy form, and scores it."""
-    if not db.get(User, user_id):
-        raise HTTPException(404, "User not found")
+    require_owner(user_id, current_user)
     o = Opportunity(
-        user_id=user_id, source_email_id=f"dummy-{random.randint(1000, 9999)}",
+        user_id=current_user.id, source_email_id=f"dummy-{random.randint(1000, 9999)}",
         company="Demo Corp", role="Software Engineer Intern",
         required_skills=["Python", "FastAPI", "React", "SQL"],
         apply_link="http://localhost:8000/dummy/apply",
@@ -64,4 +68,4 @@ def create_opportunity(user_id: int, db: Session = Depends(get_db)):
     )
     db.add(o)
     db.commit()
-    return {"opportunity_id": o.id, "matching": run_matching(db, user_id)}
+    return {"opportunity_id": o.id, "matching": run_matching(db, current_user.id)}

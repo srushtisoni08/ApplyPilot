@@ -9,6 +9,10 @@ class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
+    full_name: Mapped[str] = mapped_column(String(255), default="")
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(default=True)
+    gmail_email: Mapped[str | None] = mapped_column(String(255))
     google_access_token: Mapped[str | None] = mapped_column(Text)    # encrypted
     google_refresh_token: Mapped[str | None] = mapped_column(Text)   # encrypted
     last_email_sync: Mapped[datetime | None] = mapped_column(DateTime)

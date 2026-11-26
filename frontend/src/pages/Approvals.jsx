@@ -49,6 +49,7 @@ export default function Approvals({ userId }) {
               <img
                 src={`${api.screenshotUrl(a.application_id)}&t=${a.approval_id}`}
                 alt="Filled form"
+                crossOrigin="use-credentials"
                 className="w-full rounded border"
               />
             )}

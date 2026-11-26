@@ -14,16 +14,22 @@ from app.services.writer import OUT_DIR, generate
 from app.services.apply import submit_application
 from app.services.gmail import SendPermissionError, send_email
 from app.models.tables import User
+from app.security import get_current_user, require_owner
 
 router = APIRouter(tags=["applications"])
 LOCKED = ("submitted", "interview", "offer", "rejected")
 
 
 @router.post("/applications/start/{opportunity_id}")
-def start(opportunity_id: int, force: bool = False, db: Session = Depends(get_db)):
+def start(
+    opportunity_id: int,
+    force: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Gate 1: user picked this job. (Re)generates resume + cover letter, then waits for approval."""
     opp = db.get(Opportunity, opportunity_id)
-    if not opp:
+    if not opp or opp.user_id != current_user.id:
         raise HTTPException(404, "Opportunity not found")
     prow = db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == opp.user_id))
     if not prow or not prow.confirmed:
@@ -73,12 +79,17 @@ def start(opportunity_id: int, force: bool = False, db: Session = Depends(get_db
 
 
 @router.get("/approvals/{user_id}")
-def pending_approvals(user_id: int, db: Session = Depends(get_db)):
+def pending_approvals(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_owner(user_id, current_user)
     rows = db.execute(
         select(Approval, Application, Opportunity)
         .join(Application, Approval.application_id == Application.id)
         .join(Opportunity, Application.opportunity_id == Opportunity.id)
-        .where(Opportunity.user_id == user_id, Approval.decision == "pending")
+        .where(Opportunity.user_id == current_user.id, Approval.decision == "pending")
         .order_by(Approval.created_at.desc())
     ).all()
     return [
@@ -119,7 +130,7 @@ def _approve_email(db: Session, a: Approval, app: Application, opp: Opportunity)
         audit(db, opp.user_id, "apply.send_email", {"application_id": app.id}, {"error": "send permission"},
               approved_by="user", status="error")
         db.commit()
-        raise HTTPException(403, f"{exc} Open http://localhost:8000/auth/google, accept, then click Send again.")
+        raise HTTPException(403, f"{exc} Connect Gmail from your ApplyPilot account, then click Send again.")
     except Exception as exc:
         db.rollback()
         app.status = "needs_attention"
@@ -137,17 +148,25 @@ def _approve_email(db: Session, a: Approval, app: Application, opp: Opportunity)
 
 
 @router.post("/approvals/{approval_id}/decide")
-def decide(approval_id: int, body: Decision, db: Session = Depends(get_db)):
+def decide(
+    approval_id: int,
+    body: Decision,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     a = db.get(Approval, approval_id)
     if not a:
+        raise HTTPException(404, "Approval not found")
+    app = db.get(Application, a.application_id)
+    if not app:
+        raise HTTPException(404, "Approval not found")
+    opp = db.get(Opportunity, app.opportunity_id)
+    if not opp or opp.user_id != current_user.id:
         raise HTTPException(404, "Approval not found")
     if a.decision != "pending":
         raise HTTPException(400, f"Already {a.decision}")
     if a.kind == "resume" and body.decision == "approved" and not (a.payload.get("fact_check") or {}).get("passed"):
         raise HTTPException(400, "Fact check failed. Reject, then click Prepare again.")
-
-    app = db.get(Application, a.application_id)
-    opp = db.get(Opportunity, app.opportunity_id)
     is_email = a.kind == "submission" and a.payload.get("method") == "email"
     if is_email and body.decision == "approved":
         return _approve_email(db, a, app, opp)
@@ -186,8 +205,16 @@ def decide(approval_id: int, body: Decision, db: Session = Depends(get_db)):
 
 
 @router.get("/applications/{app_id}/file/{ext}")
-def get_file(app_id: int, ext: str, db: Session = Depends(get_db)):
+def get_file(
+    app_id: int,
+    ext: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     app = db.get(Application, app_id)
+    opp = db.get(Opportunity, app.opportunity_id) if app else None
+    if not opp or opp.user_id != current_user.id:
+        raise HTTPException(404, "File not found")
     path = OUT_DIR / f"{app.resume_file}.{ext}" if app and app.resume_file and ext in ("pdf", "docx") else None
     if not path or not path.exists():
         raise HTTPException(404, "File not found")
