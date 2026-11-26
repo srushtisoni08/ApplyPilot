@@ -77,3 +77,7 @@ class FieldMap(BaseModel):
 
 class FormMapping(BaseModel):
     fields: list[FieldMap] = []
+
+class ReplyClass(BaseModel):
+    category: str  # interview / rejection / received / other
+    reason: str

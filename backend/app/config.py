@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     OLOSTEP_API_KEY: str = ""
+    N8N_API_KEY: str = ""
     CRUSTDATA_API_KEY: str = ""
     TESSERACT_CMD: str = ""
     TESSDATA_PREFIX: str = ""

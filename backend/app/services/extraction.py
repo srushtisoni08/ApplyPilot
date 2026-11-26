@@ -49,12 +49,12 @@ def build_profile(db: Session, user_id: int, doc_ids: list[int] | None) -> Candi
     return row
 
 
-def process_emails(db: Session, user: User, n: int = 20) -> dict:
+def process_emails(db: Session, user: User, n: int = 20, since=None) -> dict:
     stats = {
         "fetched": 0, "already_done": 0, "keyword_skip": 0,
         "not_opportunity": 0, "saved": [], "errors": [], "stopped_early": False,
     }
-    for e in fetch_emails(db, user, max_results=n):
+    for e in fetch_emails(db, user, since=since, max_results=n):
         stats["fetched"] += 1
         if db.scalar(select(Opportunity.id).where(
             Opportunity.user_id == user.id, Opportunity.source_email_id == e["id"]

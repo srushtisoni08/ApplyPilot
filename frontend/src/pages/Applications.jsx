@@ -11,6 +11,7 @@ const STATUS = {
   needs_attention: "bg-red-100 text-red-800",
   interview: "bg-purple-100 text-purple-800",
   rejected: "bg-slate-200 text-slate-700",
+  offer: "bg-emerald-100 text-emerald-800",
 };
 const CAN_FILL = ["ready", "needs_attention", "awaiting_submit"];
 
@@ -31,8 +32,8 @@ export default function Applications({ userId, onFilled }) {
     load();
   }, [userId]);
 
-  const fill = async (id) => {
-    setBusy("Opening the form and filling it...");
+  const fill = async (id, method) => {
+    setBusy(method === "email" ? "Preparing the email..." : "Opening the form and filling it...");
     setMsg("");
     try {
       const r = await api.fill(id, watch);
@@ -47,6 +48,16 @@ export default function Applications({ userId, onFilled }) {
       await load();
     }
     setBusy("");
+  };
+    const markApplied = async (id) => {
+    if (!window.confirm("Mark this as applied? Do this only if you already applied yourself.")) return;
+    setMsg("");
+    try {
+      await api.markApplied(id);
+      await load();
+    } catch (e) {
+      setMsg("Error: " + e.message);
+    }
   };
 
   return (
@@ -87,15 +98,26 @@ export default function Applications({ userId, onFilled }) {
                   </td>
                   <td className="p-3">{r.submitted_at ? r.submitted_at.slice(0, 10) : "-"}</td>
                   <td className="p-3">{r.reference_number || "-"}</td>
-                  <td className="p-3 text-right">
+                                   <td className="p-3 text-right">
                     {CAN_FILL.includes(r.status) && (
-                      <button
-                        onClick={() => fill(r.application_id)}
-                        disabled={!!busy}
-                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-white disabled:opacity-50"
-                      >
-                        Fill form
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        {r.apply_method !== "none" && (
+                          <button
+                            onClick={() => fill(r.application_id, r.apply_method)}
+                            disabled={!!busy}
+                            className="rounded-lg bg-slate-900 px-3 py-1.5 text-white disabled:opacity-50"
+                          >
+                            {r.apply_method === "email" ? "Prepare email" : "Fill form"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => markApplied(r.application_id)}
+                          disabled={!!busy}
+                          className="rounded-lg border px-3 py-1.5 disabled:opacity-50"
+                        >
+                          Mark as applied
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

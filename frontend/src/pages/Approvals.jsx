@@ -45,11 +45,13 @@ export default function Approvals({ userId }) {
               <div className="font-semibold">{a.company || "Unknown company"}</div>
               <div className="text-sm text-slate-600">{a.role || "Unknown role"}</div>
             </div>
-            <img
-              src={`${api.screenshotUrl(a.application_id)}&t=${a.approval_id}`}
-              alt="Filled form"
-              className="w-full rounded border"
-            />
+            {a.method !== "email" && (
+              <img
+                src={`${api.screenshotUrl(a.application_id)}&t=${a.approval_id}`}
+                alt="Filled form"
+                className="w-full rounded border"
+              />
+            )}
             <table className="w-full text-sm">
               <tbody>
                 {(a.preview || []).map((p, i) => (
@@ -60,7 +62,7 @@ export default function Approvals({ userId }) {
                 ))}
               </tbody>
             </table>
-            <p className="text-sm text-amber-700">Clicking Submit sends this application to the company.</p>
+            <p className="text-sm text-amber-700">{a.method === "email" ? "Clicking Send emails this application from your Gmail." : "Clicking Submit sends this application to the company."}</p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => decide(a.approval_id, "rejected")}
@@ -74,7 +76,7 @@ export default function Approvals({ userId }) {
                 disabled={busy === a.approval_id}
                 className="rounded-lg bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50"
               >
-                Submit application
+                {a.method === "email" ? "Send email" : "Submit application"}
               </button>
             </div>
           </div>

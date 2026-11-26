@@ -12,9 +12,11 @@ from app.models.tables import Application, Approval, CandidateProfile, Match, Op
 from app.services.audit import audit
 from app.services.writer import OUT_DIR, generate
 from app.services.apply import submit_application
+from app.services.gmail import SendPermissionError, send_email
+from app.models.tables import User
 
 router = APIRouter(tags=["applications"])
-LOCKED = ("submitted", "interview", "rejected")
+LOCKED = ("submitted", "interview", "offer", "rejected")
 
 
 @router.post("/applications/start/{opportunity_id}")
@@ -85,6 +87,7 @@ def pending_approvals(user_id: int, db: Session = Depends(get_db)):
             "company": o.company, "role": o.role, "cover_letter": app.cover_letter,
             "selected": a.payload.get("selected"), "fact_check": a.payload.get("fact_check"),
             "preview": a.payload.get("preview"),
+            "method": a.payload.get("method", "web"),
         }
         for a, app, o in rows
     ]
@@ -92,6 +95,45 @@ def pending_approvals(user_id: int, db: Session = Depends(get_db)):
 
 class Decision(BaseModel):
     decision: Literal["approved", "rejected"]
+
+
+def _approve_email(db: Session, a: Approval, app: Application, opp: Opportunity):
+    """GATE 2 for email applications: the email is sent only now."""
+    if app.status != "awaiting_submit" or app.reference_number:
+        raise HTTPException(400, f"Cannot send while status is '{app.status}'")
+    app.status = "submitting"  # blocks double send
+    a.decision = "approved"
+    a.decided_at = datetime.now()
+    audit(db, opp.user_id, "approval.decide", {"approval_id": a.id, "kind": a.kind},
+          {"decision": "approved"}, approved_by="user")
+    db.commit()
+    em = a.payload["email"]
+    user = db.get(User, opp.user_id)
+    try:
+        msg_id = send_email(db, user, em["to"], em["subject"], em["body"],
+                            OUT_DIR / f"{app.resume_file}.pdf", em["attachment"])
+    except SendPermissionError as exc:  # nothing was sent: let the user reconnect and retry
+        db.rollback()
+        a.decision, a.decided_at = "pending", None
+        app.status = "awaiting_submit"
+        audit(db, opp.user_id, "apply.send_email", {"application_id": app.id}, {"error": "send permission"},
+              approved_by="user", status="error")
+        db.commit()
+        raise HTTPException(403, f"{exc} Open http://localhost:8000/auth/google, accept, then click Send again.")
+    except Exception as exc:
+        db.rollback()
+        app.status = "needs_attention"
+        audit(db, opp.user_id, "apply.send_email", {"application_id": app.id},
+              {"error": str(exc)[:200]}, approved_by="user", status="error")
+        db.commit()
+        return {"decision": "approved", "application_status": app.status}
+    app.status = "submitted"
+    app.submitted_at = datetime.now()
+    app.reference_number = f"gmail:{msg_id}"
+    audit(db, opp.user_id, "apply.send_email", {"application_id": app.id},
+          {"to": em["to"], "gmail_id": msg_id}, approved_by="user")
+    db.commit()
+    return {"decision": "approved", "application_status": app.status}
 
 
 @router.post("/approvals/{approval_id}/decide")
@@ -104,10 +146,14 @@ def decide(approval_id: int, body: Decision, db: Session = Depends(get_db)):
     if a.kind == "resume" and body.decision == "approved" and not (a.payload.get("fact_check") or {}).get("passed"):
         raise HTTPException(400, "Fact check failed. Reject, then click Prepare again.")
 
-    a.decision = body.decision
-    a.decided_at = datetime.now()
     app = db.get(Application, a.application_id)
     opp = db.get(Opportunity, app.opportunity_id)
+    is_email = a.kind == "submission" and a.payload.get("method") == "email"
+    if is_email and body.decision == "approved":
+        return _approve_email(db, a, app, opp)
+
+    a.decision = body.decision
+    a.decided_at = datetime.now()
     if a.kind == "resume":
         app.status = "ready" if body.decision == "approved" else "draft"
     elif a.kind == "submission":

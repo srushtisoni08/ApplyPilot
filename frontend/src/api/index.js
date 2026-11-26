@@ -42,4 +42,5 @@ export const api = {
   applications: (id) => req(`/applications/list/${id}`),
   fill: (appId, watch) => req(`/applications/${appId}/fill?watch=${watch}`, { method: "POST" }),
   screenshotUrl: (appId, kind = "filled") => `${BASE}/applications/${appId}/screenshot?kind=${kind}`,
+  markApplied: (appId) => req(`/applications/${appId}/mark-applied`, { method: "POST" }),
 };

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models.db import get_db
 from app.models.tables import Match, Opportunity, User
+from app.services.apply_target import classify_apply_target
 from app.services.matching import run_matching
 
 router = APIRouter(prefix="/matches", tags=["matches"])
@@ -31,6 +32,7 @@ def list_matches(user_id: int, db: Session = Depends(get_db)):
         {
             "opportunity_id": o.id, "company": o.company, "role": o.role,
             "deadline": o.deadline, "apply_link": o.apply_link,
+            "apply_method": classify_apply_target(o.apply_link)["method"],
             "score": m.score, "category": m.category, "explanation": m.explanation,
         }
         for o, m in rows

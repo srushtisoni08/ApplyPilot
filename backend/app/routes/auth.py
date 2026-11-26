@@ -13,6 +13,7 @@ from app.models.tables import User
 from app.services.crypto import encrypt
 from app.services.gmail import SCOPES, fetch_emails
 
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")  # tolerate Google returning extra/fewer scopes
 os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")  # local http only; remove in prod
 
 router = APIRouter(prefix="/auth", tags=["auth"])
