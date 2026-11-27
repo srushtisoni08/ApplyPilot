@@ -33,6 +33,18 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     OLOSTEP_API_KEY: str = ""
     N8N_API_KEY: str = ""
+    SCHEDULER_ENABLED: bool = False
+    SCHEDULER_USER_IDS: str = ""          # "2" or "1,2"; empty = every user connected to Gmail
+    SCHEDULER_TIMEZONE: str = "Asia/Kolkata"
+    SCHEDULER_AUTO_PREPARE: bool = False
+    AGENT_INTERVAL_MIN: int = 30
+    REPLIES_INTERVAL_MIN: int = 15
+    DEADLINE_HOUR: int = 9
+    DEADLINE_DAYS: int = 3
+    DISCOVERY_ENABLED: bool = False
+    DISCOVERY_INTERVAL_HOURS: int = 24
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHAT_ID: str = ""
     CRUSTDATA_API_KEY: str = ""
     TESSERACT_CMD: str = ""
     TESSDATA_PREFIX: str = ""

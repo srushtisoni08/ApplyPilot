@@ -17,7 +17,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routes import agent
 
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+from app.routes import replies
+from app.services.scheduler import start_scheduler, stop_scheduler
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    start_scheduler()  # does nothing unless SCHEDULER_ENABLED=true
+    yield
+    stop_scheduler()
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL, "http://127.0.0.1:5173"],
@@ -35,6 +48,7 @@ app.include_router(dummy.router)
 app.include_router(automation.router)
 app.include_router(agent.router)
 app.include_router(agent.n8n_router)
+app.include_router(replies.router)
 
 @app.get("/health")
 def health() -> dict[str, object]:

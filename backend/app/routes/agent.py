@@ -6,6 +6,7 @@ from app.agent.orchestrator import run_cycle
 from app.models.db import get_db
 from app.models.tables import AuditLog, User
 from app.security import get_current_user, require_key
+from app.agent.orchestrator import report_lines, run_cycle
 
 router = APIRouter(tags=["agent"])
 n8n_router = APIRouter(prefix="/automation", tags=["automation"], dependencies=[Depends(require_key)])
@@ -45,16 +46,8 @@ def run_agent_for_n8n(user_id: int, auto_prepare: bool = False, db: Session = De
     if not user:
         raise HTTPException(404, "User not found")
     report = run_cycle(db, user, auto_prepare)
-    lines = []
-    for s in report["steps"]:
-        r = s["result"] or {}
-        if s["tool"] == "score_opportunities":
-            lines += [f"New: {m['company'] or '?'} - {m['role'] or '?'} {round(m['score'])}% ({m['category']})"
-                      for m in r.get("matched", []) if m["category"] != "unsuitable"]
-        elif s["tool"] == "prepare_documents" and s["ok"]:
-            lines.append(f"Documents ready for your approval (application {r['application_id']})")
-        elif s["tool"] == "check_replies":
-            lines += [f"Reply: {u['company']} - now {u['status'].upper()}" for u in r.get("updates", [])]
+    lines = report_lines(report)
+
     for a in (report["state"] or {}).get("needs_attention", []):
         lines.append(f"Needs attention: {a['company']} - {a['role']}")
     return {"count": len(lines), "message": "\n".join(lines), "blocked": report["blocked"]} 

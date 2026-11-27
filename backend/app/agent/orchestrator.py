@@ -151,3 +151,18 @@ def run_cycle(db: Session, user: User, auto_prepare: bool = False, max_prepare: 
           {"steps": len(report["steps"]), "failed": sum(1 for s in report["steps"] if not s["ok"])})
     db.commit()
     return report
+
+def report_lines(report: dict) -> list[str]:
+    lines = []
+    for s in report["steps"]:
+        r = s["result"] or {}
+        if s["tool"] == "score_opportunities":
+            lines += [f"New: {m['company'] or '?'} - {m['role'] or '?'} {round(m['score'])}% ({m['category']})"
+                      for m in r.get("matched", []) if m["category"] != "unsuitable"]
+        elif s["tool"] == "prepare_documents" and s["ok"]:
+            lines.append(f"Documents ready for your approval (application {r['application_id']})")
+        elif s["tool"] == "check_replies":
+            lines += [f"Reply: {u['company']} - now {u['status'].upper()}" for u in r.get("updates", [])]
+    for a in (report["state"] or {}).get("needs_attention", []):
+        lines.append(f"Needs attention: {a['company']} - {a['role']}")
+    return lines

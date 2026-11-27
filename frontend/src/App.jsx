@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Opportunities from "./pages/Opportunities";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Replies from "./pages/Replies";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -69,7 +70,7 @@ export default function App() {
       : <Login onLogin={(body) => acceptSession(api.login, body)} onRegister={() => setAuthPage("register")} />;
   }
 
-  const titles = { dashboard: "Dashboard", opportunities: "Opportunities", approvals: "Approvals", applications: "Applications", profile: "My Profile", activity: "Activity", settings: "Settings" };
+  const titles = { dashboard: "Dashboard", opportunities: "Opportunities", approvals: "Approvals", applications: "Applications", profile: "My Profile", activity: "Activity", settings: "Settings" ,replies: "Replies",};
   return (
     <div className="min-h-screen bg-[#F6F8FC] text-[#202124] lg:flex">
       <Sidebar tab={tab} onChange={setTab} pending={pending} collapsed={collapsed} onCollapse={() => setCollapsed(!collapsed)} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
@@ -91,6 +92,7 @@ export default function App() {
           {tab === "opportunities" && <Opportunities userId={user.id} onPrepared={() => { setTab("approvals"); setApprovalRefresh((value) => value + 1); }} search={search} onScanned={() => setDashboardRefresh((value) => value + 1)} />}
           {tab === "approvals" && <Approvals userId={user.id} onDecided={() => { setApprovalRefresh((value) => value + 1); setDashboardRefresh((value) => value + 1); }} />}
           {tab === "applications" && <Applications userId={user.id} onFilled={() => { setTab("approvals"); setApprovalRefresh((value) => value + 1); }} search={search} />}
+          {tab === "replies" && <Replies userId={user.id} search={search} />}
           {tab === "activity" && <Activity />}
           <div className="sr-only" aria-live="polite">{titles[tab]}</div>
         </main>

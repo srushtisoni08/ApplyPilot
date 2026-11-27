@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
@@ -55,7 +56,14 @@ def check_replies(db: Session, user: User) -> list[dict]:
             db.rollback()
             break  # LLM unavailable: stop, the next scheduled run retries (email not marked as seen)
         cat = c.category if c.category in ("offer", "interview", "rejection", "received", "other") else "other"
-        audit(db, user.id, "reply.classify", {"email_id": e["id"], "application_id": a.id}, {"category": cat})
+        audit(db, user.id, "reply.classify", {"email_id": e["id"], "application_id": a.id}, {
+            "category": cat,
+            "reason": str(getattr(c, "reason", "") or "")[:300],
+            "subject": e["subject"][:200],
+            "sender": e["sender"][:200],
+            "date": e.get("date", "")[:60],
+            "snippet": re.sub(r"\s+", " ", e["body"]).strip()[:500],
+        })
         new = {"offer": "offer", "interview": "interview", "rejection": "rejected"}.get(cat)
         if new and a.status != new and a.status not in ("rejected", "offer"):
             a.status = new
@@ -88,3 +96,27 @@ def deadlines_soon(db: Session, user_id: int, days: int) -> list[dict]:
         for o, m, a in rows
         if not a or a.status not in DONE
     ]
+def list_replies(db: Session, user_id: int, limit: int = 100) -> list[dict]:
+    logs = db.scalars(
+        select(AuditLog).where(AuditLog.tool == "reply.classify", AuditLog.user_id == user_id)
+        .order_by(AuditLog.id.desc()).limit(limit)
+    ).all()
+    apps = {a.id: (a, o) for a, o in db.execute(
+        select(Application, Opportunity)
+        .join(Opportunity, Application.opportunity_id == Opportunity.id)
+        .where(Opportunity.user_id == user_id)
+    ).all()}
+    out = []
+    for log in logs:
+        hit = apps.get((log.input or {}).get("application_id"))
+        if not hit:
+            continue
+        a, o = hit
+        d = log.output or {}
+        out.append({
+            "id": log.id, "application_id": a.id, "company": o.company, "role": o.role,
+            "application_status": a.status, "category": d.get("category", "other"),
+            "subject": d.get("subject"), "sender": d.get("sender"), "date": d.get("date"),
+            "snippet": d.get("snippet"), "reason": d.get("reason"), "received_at": log.created_at,
+        })
+    return out
