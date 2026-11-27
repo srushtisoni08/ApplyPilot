@@ -21,3 +21,4 @@ google-genai
 numpy
 reportlab
 playwright
+requests

@@ -8,6 +8,7 @@ from app.models.db import get_db
 from app.models.tables import User
 from app.security import require_key
 from app.services.extraction import process_emails
+from app.services.discovery import discover
 from app.services.matching import run_matching
 from app.services.tracking import check_replies, deadlines_soon
 
@@ -120,3 +121,21 @@ def deadlines(user_id: int, days: int = 3, db: Session = Depends(get_db)):
         for i in items
     ]
     return {"count": len(items), "message": (f"Deadlines in the next {days} days:\n" + "\n".join(lines)) if items else ""}
+
+
+@router.post("/discover/{user_id}")
+def discover_route(user_id: int, days: int = 7, db: Session = Depends(get_db)):
+    """Workflow 4: Crustdata discovery, then score. Returns message for Telegram."""
+    user = _user(db, user_id)
+    try:
+        stats = discover(db, user, days=days)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    try:
+        matched = run_matching(db, user_id)["matched"]
+    except ValueError:
+        matched = []
+    good = [m for m in matched if m["category"] != "unsuitable"]
+    lines = [f"• {m['company']} - {m['role']}: {round(m['score'])}% ({m['category']})" for m in good]
+    return {"count": len(good), "found": stats["found"], "errors": len(stats["errors"]),
+            "message": ("New discovered jobs:\n" + "\n".join(lines)) if lines else ""}
