@@ -8,16 +8,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.db import get_db
-from app.models.tables import Application, Approval, CandidateProfile, Match, Opportunity
+from app.models.tables import Application, Approval, Opportunity
 from app.services.audit import audit
-from app.services.writer import OUT_DIR, generate
+from app.services.writer import OUT_DIR
 from app.services.apply import submit_application
 from app.services.gmail import SendPermissionError, send_email
 from app.models.tables import User
 from app.security import get_current_user, require_owner
+from app.agent.permissions import assert_submit_approved
+from app.services.prepare import PrepareError, prepare_application
 
 router = APIRouter(tags=["applications"])
-LOCKED = ("submitted", "interview", "offer", "rejected")
 
 
 @router.post("/applications/start/{opportunity_id}")
@@ -31,51 +32,10 @@ def start(
     opp = db.get(Opportunity, opportunity_id)
     if not opp or opp.user_id != current_user.id:
         raise HTTPException(404, "Opportunity not found")
-    prow = db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == opp.user_id))
-    if not prow or not prow.confirmed:
-        raise HTTPException(400, "Confirm your profile first")
-    match = db.scalar(select(Match).where(Match.opportunity_id == opp.id))
-    if match and match.category == "unsuitable" and not force:
-        raise HTTPException(400, f"Marked unsuitable: {match.explanation}")
-
-    key = f"{opp.user_id}:{opp.id}"  # idempotency: one application per job
-    app = db.scalar(select(Application).where(Application.idempotency_key == key))
-    if app and app.status in LOCKED:
-        raise HTTPException(400, f"Application already {app.status}")
-    if not app:
-        app = Application(opportunity_id=opp.id, idempotency_key=key, status="draft")
-        db.add(app)
-        db.flush()
-        db.add(Approval(application_id=app.id, kind="job", payload={"opportunity_id": opp.id},
-                        decision="approved", decided_at=datetime.now()))
-        db.commit()
-
-    for old in db.scalars(select(Approval).where(
-            Approval.application_id == app.id, Approval.kind == "resume", Approval.decision == "pending")):
-        old.decision = "superseded"
-
     try:
-        out = generate(app.id, prow.data, opp)
-    except Exception as exc:
-        db.rollback()
-        app.status = "needs_attention"
-        audit(db, opp.user_id, "writer.generate", {"opportunity_id": opp.id},
-              {"error": str(exc)[:200]}, status="error")
-        db.commit()
-        raise HTTPException(502, f"Generation failed: {str(exc)[:200]}")
-
-    app.cover_letter = out["letter"]
-    app.resume_file = out["file"]
-    app.status = "awaiting_approval"
-    appr = Approval(application_id=app.id, kind="resume", decision="pending", payload={
-        "selected": out["selected"],
-        "fact_check": {"passed": not out["issues"], "issues": out["issues"]},
-    })
-    db.add(appr)
-    audit(db, opp.user_id, "writer.generate", {"opportunity_id": opp.id},
-          {"application_id": app.id, "fact_check_passed": not out["issues"]}, approved_by="user")
-    db.commit()
-    return {"application_id": app.id, "approval_id": appr.id, "fact_check_passed": not out["issues"]}
+        return prepare_application(db, opp, force, actor="user")
+    except PrepareError as exc:
+        raise HTTPException(exc.status, exc.message)
 
 
 @router.get("/approvals/{user_id}")
@@ -118,6 +78,7 @@ def _approve_email(db: Session, a: Approval, app: Application, opp: Opportunity)
     audit(db, opp.user_id, "approval.decide", {"approval_id": a.id, "kind": a.kind},
           {"decision": "approved"}, approved_by="user")
     db.commit()
+    assert_submit_approved(db, app.id)
     em = a.payload["email"]
     user = db.get(User, opp.user_id)
     try:
@@ -188,6 +149,7 @@ def decide(
 
     if a.kind == "submission" and body.decision == "approved":
         # GATE 2 passed: only now does the browser touch the real submit button
+        assert_submit_approved(db, app.id)
         try:
             r = submit_application(app, opp, a.payload["plan"])
             app.reference_number = r["reference"]

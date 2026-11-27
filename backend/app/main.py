@@ -15,6 +15,7 @@ from app.routes import automation
 
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
+from app.routes import agent
 
 app = FastAPI()
 app.add_middleware(
@@ -32,6 +33,8 @@ app.include_router(applications.router)
 app.include_router(apply.router)
 app.include_router(dummy.router)
 app.include_router(automation.router)
+app.include_router(agent.router)
+app.include_router(agent.n8n_router)
 
 @app.get("/health")
 def health() -> dict[str, object]:

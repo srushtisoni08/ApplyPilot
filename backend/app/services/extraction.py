@@ -8,6 +8,7 @@ from app.models.schemas import CandidateProfileSchema, EmailCheck, OpportunityDa
 from app.models.tables import CandidateProfile, Document, Opportunity, User
 from app.services.gmail import fetch_emails
 from app.services.llm import extract
+from app.services.olostep import find_job_link, scrape_page
 
 KEYWORDS = re.compile(
     r"\b(apply|applications?|hiring|deadline|internships?|cgpa|eligib\w*|openings?|vacanc\w*|recruit\w*|job|position)\b",
@@ -52,7 +53,8 @@ def build_profile(db: Session, user_id: int, doc_ids: list[int] | None) -> Candi
 def process_emails(db: Session, user: User, n: int = 20, since=None) -> dict:
     stats = {
         "fetched": 0, "already_done": 0, "keyword_skip": 0,
-        "not_opportunity": 0, "saved": [], "errors": [], "stopped_early": False,
+        "not_opportunity": 0, "enriched": 0, "scrape_failed": 0,
+        "saved": [], "errors": [], "stopped_early": False,
     }
     for e in fetch_emails(db, user, since=since, max_results=n):
         stats["fetched"] += 1
@@ -74,6 +76,22 @@ def process_emails(db: Session, user: User, n: int = 20, since=None) -> dict:
                 continue
 
             o = extract(OpportunityData, text, "Extract the job/internship opportunity details. deadline must be YYYY-MM-DD.")
+            link = find_job_link(text)
+            if link and not (o.role and o.required_skills):  # thin email: read the linked page
+                try:
+                    page = scrape_page(link)
+                    if page:
+                        o = extract(
+                            OpportunityData,
+                            f"{text[:3000]}\n\n--- LINKED PAGE ({link}) ---\n{page}",
+                            "Extract the job/internship opportunity details from the email and its linked page. "
+                            "deadline must be YYYY-MM-DD.",
+                        )
+                        if not o.apply_link:
+                            o.apply_link = link
+                        stats["enriched"] += 1
+                except Exception:  # Olostep down or out of credits: keep the email-only result
+                    stats["scrape_failed"] += 1
             if not o.company and not o.role:  # job-alert digest, not one real opportunity
                 stats["not_opportunity"] += 1
                 continue

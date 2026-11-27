@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   BriefcaseBusiness, CheckCheck, ChevronLeft, ChevronRight, LayoutDashboard,
-  LogOut, Menu, Search, Settings, UserRound, X, Bell,
+  LogOut, Menu, Search, Settings, UserRound, X, Bell, Activity,
 } from "lucide-react";
 
 const LINKS = [
@@ -10,6 +10,7 @@ const LINKS = [
   { id: "approvals", label: "Approvals", icon: CheckCheck },
   { id: "applications", label: "Applications", icon: BriefcaseBusiness },
   { id: "profile", label: "My Profile", icon: UserRound },
+  { id: "activity", label: "Activity", icon: Activity },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

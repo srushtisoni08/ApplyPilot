@@ -52,4 +52,6 @@ export const api = {
   fill: (appId, watch) => req(`/applications/${appId}/fill?watch=${watch}`, { method: "POST" }),
   screenshotUrl: (appId, kind = "filled") => `${BASE}/applications/${appId}/screenshot?kind=${kind}`,
   markApplied: (appId) => req(`/applications/${appId}/mark-applied`, { method: "POST" }),
+  runAgent: (autoPrepare) => req(`/agent/run?auto_prepare=${autoPrepare}`, { method: "POST" }),
+  activity: () => req("/agent/activity"),
 };
