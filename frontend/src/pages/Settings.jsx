@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity, AtSign, Clock3, KeyRound, Mail, RefreshCw, ShieldCheck,
   Sparkles, UserRound, Workflow,
@@ -6,19 +6,15 @@ import {
 import { api } from "../api";
 import { StatusMessage } from "../components/UI";
 
-const AUTOMATION_ITEMS = [
-  { label: "Automatic email scanning", description: "Scheduled scanning is managed by the external n8n workflow.", icon: Mail },
-  { label: "Email scanning frequency", description: "The interval is configured in the n8n scheduler, not in this app.", icon: Clock3, frequency: true },
-  { label: "Automatic opportunity extraction", description: "Extraction runs as part of the external automation pipeline.", icon: Sparkles },
-  { label: "Automatic resume generation", description: "Resume generation currently starts when you prepare an application.", icon: RefreshCw },
-];
+const every = (min) => (min % 60 === 0 ? `every ${min / 60} h` : `every ${min} min`);
 
-function UnavailableControl({ label, frequency }) {
-  if (frequency) {
-    return <select disabled aria-label={`${label} managed by n8n`} className="rounded-lg border border-[#DADCE0] bg-[#F8F9FA] px-2.5 py-1.5 text-xs text-[#5F6368] opacity-80"><option>Managed in n8n</option></select>;
-  }
+function Row({ icon: Icon, label, description, value, on }) {
   return (
-    <span aria-label={`${label} managed by n8n`} className="shrink-0 rounded-full bg-[#F1F3F4] px-2.5 py-1 text-[11px] font-semibold text-[#5F6368]">n8n-managed</span>
+    <div className="flex items-center gap-3 py-4">
+      <Icon className="h-5 w-5 shrink-0 text-[#5F6368]" />
+      <div className="min-w-0 flex-1"><p className="text-sm font-medium text-[#202124]">{label}</p><p className="mt-1 text-xs leading-5 text-[#5F6368]">{description}</p></div>
+      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${on === false ? "bg-[#F1F3F4] text-[#5F6368]" : "bg-[#E6F4EA] text-[#137333]"}`}>{value}</span>
+    </div>
   );
 }
 
@@ -29,6 +25,16 @@ export default function Settings({ user, gmailConnected, onUserUpdate }) {
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [auto, setAuto] = useState(null);
+
+  useEffect(() => {
+    api.agentStatus().then(setAuto).catch(() => setAuto(false));
+  }, []);
+
+  const runNow = () => run("Running the agent...", async () => {
+    const r = await api.runAgent(false);
+    setMessage(`Agent run finished: ${r.steps?.length ?? 0} step(s) completed.`);
+  });
 
   const run = async (label, action) => {
     setBusy(label);
@@ -124,25 +130,22 @@ export default function Settings({ user, gmailConnected, onUserUpdate }) {
       <section className="rounded-2xl border border-[#DADCE0] bg-white p-5 shadow-sm sm:p-6">
         <div className="flex items-start gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#E8F0FE] text-[#0B57D0]"><Workflow className="h-5 w-5" /></div>
-          <div><h2 className="font-semibold text-[#202124]">Automation settings</h2><p className="mt-1 text-sm text-[#5F6368]">Automation is currently managed by the external n8n workflow.</p></div>
+          <div><h2 className="font-semibold text-[#202124]">Automation</h2><p className="mt-1 text-sm text-[#5F6368]">What ApplyPilot does in the background. Schedules are set by the server administrator.</p></div>
         </div>
-        <div className="mt-5 divide-y divide-[#E8EAED] rounded-xl border border-[#E8EAED] px-4 sm:px-5">
-          {AUTOMATION_ITEMS.map(({ label, description, icon: Icon, frequency }) => (
-            <div key={label} className="flex items-center gap-3 py-4">
-              <Icon className="h-5 w-5 shrink-0 text-[#5F6368]" />
-              <div className="min-w-0 flex-1"><p className="text-sm font-medium text-[#202124]">{label}</p><p className="mt-1 text-xs leading-5 text-[#5F6368]">{description}</p></div>
-              <UnavailableControl label={label} frequency={frequency} />
-            </div>
-          ))}
-          <div className="flex items-center gap-3 py-4">
-            <ShieldCheck className="h-5 w-5 shrink-0 text-[#188038]" />
-            <div className="min-w-0 flex-1"><p className="text-sm font-medium text-[#202124]">Approval before submission</p><p className="mt-1 text-xs leading-5 text-[#5F6368]">ApplyPilot always requires your approval before submitting or sending an application.</p></div>
-            <span className="rounded-full bg-[#E6F4EA] px-2.5 py-1 text-xs font-semibold text-[#137333]">Always on</span>
+        {auto === false && <p className="mt-5 text-sm text-[#B3261E]">Could not load automation status.</p>}
+        {auto && (
+          <div className="mt-5 divide-y divide-[#E8EAED] rounded-xl border border-[#E8EAED] px-4 sm:px-5">
+            <Row icon={Mail} label="Inbox scanning and scoring" description="Finds new job emails, extracts details and scores them against your profile." value={auto.scheduler_enabled ? every(auto.agent_interval_min) : "Off"} on={auto.scheduler_enabled} />
+            <Row icon={RefreshCw} label="Reply tracking" description="Detects interview, offer and rejection emails for submitted applications." value={auto.scheduler_enabled ? every(auto.replies_interval_min) : "Off"} on={auto.scheduler_enabled} />
+            <Row icon={Clock3} label="Deadline reminders" description={`Daily alert for deadlines in the next ${auto.deadline_days} days.`} value={auto.scheduler_enabled ? `daily ${auto.deadline_hour}:00` : "Off"} on={auto.scheduler_enabled} />
+            <Row icon={Sparkles} label="Job discovery" description="Searches for new roles that fit your profile." value={auto.scheduler_enabled && auto.discovery_enabled ? every(auto.discovery_interval_hours * 60) : "Off"} on={auto.scheduler_enabled && auto.discovery_enabled} />
+            <Row icon={AtSign} label="Telegram alerts" description="Sends a message when there is something new for you." value={auto.telegram_configured ? "Connected" : "Not set up"} on={auto.telegram_configured} />
+            <Row icon={ShieldCheck} label="Approval before submission" description="Nothing is submitted or emailed without your approval." value="Always on" />
           </div>
-        </div>
-        <div className="mt-5 rounded-xl bg-[#F6F8FC] p-4">
-          <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-[#5F6368]" /><h3 className="text-sm font-semibold text-[#202124]">Automation execution history</h3></div>
-          <p className="mt-2 text-sm text-[#5F6368]">Execution history is not currently exposed to ApplyPilot, so there are no run details to display here.</p>
+        )}
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button onClick={runNow} disabled={!!busy || !gmailConnected} className="rounded-full bg-[#0B57D0] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0842A0] disabled:opacity-50">{busy === "Running the agent..." ? busy : "Run agent now"}</button>
+          <p className="flex items-center gap-2 text-xs text-[#5F6368]"><Activity className="h-4 w-4" />Every action is recorded on the Activity page.</p>
         </div>
       </section>
     </div>

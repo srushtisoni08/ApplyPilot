@@ -96,6 +96,8 @@ def deadlines_soon(db: Session, user_id: int, days: int) -> list[dict]:
         for o, m, a in rows
         if not a or a.status not in DONE
     ]
+
+
 def list_replies(db: Session, user_id: int, limit: int = 100) -> list[dict]:
     logs = db.scalars(
         select(AuditLog).where(AuditLog.tool == "reply.classify", AuditLog.user_id == user_id)

@@ -3,10 +3,23 @@ import { ArrowRight, BriefcaseBusiness, CheckCheck, Clock3, FileCheck2, MailSear
 import { api } from "../api";
 import { EmptyState, LoadingState, StatCard, StatusBadge, StatusMessage } from "../components/UI";
 
-function formatDate(value) {
-  if (!value) return "Not submitted";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value).slice(0, 10) : date.toLocaleDateString();
+const HINT = {
+  draft: "Draft started",
+  awaiting_approval: "Waiting for you to review the resume",
+  ready: "Resume approved, ready to fill the form",
+  awaiting_submit: "Form filled, waiting for your final approval",
+  submitting: "Submitting now",
+  needs_attention: "Not sent. Open Applications for the reason",
+  rejected: "Rejected by the company",
+};
+
+function detail(item) {
+  if (["submitted", "interview", "offer"].includes(item.status) && item.submitted_at) {
+    const d = new Date(item.submitted_at);
+    return `Submitted ${Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString()}`;
+  }
+  if (item.status === "needs_attention" && item.note) return item.note;
+  return HINT[item.status] || "In progress";
 }
 
 export default function Dashboard({ user, pending, onNavigate, refreshKey = 0 }) {
@@ -128,7 +141,7 @@ export default function Dashboard({ user, pending, onNavigate, refreshKey = 0 })
               {applications.slice(0, 4).map((item) => (
                 <button key={item.application_id} onClick={() => onNavigate("applications")} className="flex w-full items-center gap-3 py-4 text-left first:pt-0 last:pb-0">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F1F3F4] text-[#5F6368]"><Clock3 className="h-5 w-5" /></div>
-                  <div className="min-w-0 flex-1"><p className="truncate font-medium text-[#202124]">{item.role || "Role not specified"}</p><p className="truncate text-sm text-[#5F6368]">{item.company || "Company not specified"} · {formatDate(item.submitted_at)}</p></div>
+                  <div className="min-w-0 flex-1"><p className="truncate font-medium text-[#202124]">{item.role || "Role not specified"}</p><p className="truncate text-sm text-[#5F6368]">{item.company || "Company not specified"} · {detail(item)}</p></div>
                   <StatusBadge status={item.status} />
                 </button>
               ))}

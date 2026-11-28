@@ -11,7 +11,6 @@ from app.routes import profile
 from app.routes import matches
 from app.routes import applications
 from app.routes import apply, dummy
-from app.routes import automation
 
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
@@ -45,9 +44,7 @@ app.include_router(matches.router)
 app.include_router(applications.router)
 app.include_router(apply.router)
 app.include_router(dummy.router)
-app.include_router(automation.router)
 app.include_router(agent.router)
-app.include_router(agent.n8n_router)
 app.include_router(replies.router)
 
 @app.get("/health")

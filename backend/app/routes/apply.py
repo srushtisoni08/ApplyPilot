@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.models.db import get_db
-from app.models.tables import Application, Approval, CandidateProfile, Opportunity, User
+from app.models.tables import Application, Approval, AuditLog, CandidateProfile, Opportunity, User
 from app.services.apply import fill_application
 from app.services.apply_target import classify_apply_target
 from app.services.email_apply import prepare_email
@@ -14,6 +14,30 @@ from app.services.writer import OUT_DIR
 from app.security import get_current_user, require_owner
 
 router = APIRouter(tags=["apply"])
+
+
+def _notes(db: Session, user_id: int) -> dict[int, str]:
+    """Latest reason per application, so 'needs attention' always says why."""
+    logs = db.scalars(
+        select(AuditLog).where(AuditLog.user_id == user_id, AuditLog.tool.in_(
+            ["apply.fill", "apply.submit", "apply.send_email"])).order_by(AuditLog.id.desc()).limit(300)
+    ).all()
+    out: dict[int, str] = {}
+    for l in logs:
+        aid = (l.input or {}).get("application_id")
+        if aid is None or aid in out:
+            continue
+        o = l.output or {}
+        note = None
+        if o.get("error"):
+            note = f"Failed: {o['error']}"
+        elif o.get("reason"):
+            miss = f" ({', '.join(o['missing'])})" if o.get("missing") else ""
+            note = f"{o['reason']}{miss}"
+        elif o.get("verified") is False:
+            note = "Submitted, but no confirmation page was detected. Check the company site or your email."
+        out[aid] = note  # a later success clears an older failure
+    return out
 
 
 @router.get("/applications/list/{user_id}")
@@ -29,10 +53,12 @@ def list_applications(
         .where(Opportunity.user_id == current_user.id)
         .order_by(Application.id.desc())
     ).all()
+    notes = _notes(db, current_user.id)
     return [
         {"application_id": a.id, "company": o.company, "role": o.role, "status": a.status,
          "submitted_at": a.submitted_at, "reference_number": a.reference_number,
-         "apply_method": classify_apply_target(o.apply_link)["method"]}
+         "apply_method": classify_apply_target(o.apply_link)["method"],
+         "note": notes.get(a.id) if a.status == "needs_attention" else None}
         for a, o in rows
     ]
 

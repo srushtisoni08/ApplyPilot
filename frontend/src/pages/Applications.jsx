@@ -122,7 +122,7 @@ export default function Applications({ userId, onFilled, search = "" }) {
               <tbody className="divide-y divide-[#E8EAED]">
                 {visibleRows.map((item) => <tr key={item.application_id} className="hover:bg-[#FAFBFF]">
                   <td className="px-5 py-4"><p className="font-semibold text-[#202124]">{item.company || "Company not specified"}</p><p className="mt-1 text-[#5F6368]">{item.role || "Role not specified"}</p></td>
-                  <td className="px-4 py-4"><StatusBadge status={item.status} /></td>
+                  <td className="px-4 py-4"><StatusBadge status={item.status} />{item.note && <p className="mt-2 max-w-64 text-xs leading-5 text-[#B3261E]">{item.note}</p>}</td>
                   <td className="px-4 py-4 text-[#5F6368]">{formatDate(item.submitted_at)}</td>
                   <td className="max-w-48 truncate px-4 py-4 text-[#5F6368]" title={item.reference_number || ""}>{item.reference_number || "—"}</td>
                   <td className="px-5 py-4"><div className="flex justify-end gap-2">
@@ -138,6 +138,7 @@ export default function Applications({ userId, onFilled, search = "" }) {
           <div className="divide-y divide-[#E8EAED] md:hidden">
             {visibleRows.map((item) => <article key={item.application_id} className="space-y-4 p-4">
               <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-semibold text-[#202124]">{item.company || "Company not specified"}</h2><p className="mt-1 text-sm text-[#5F6368]">{item.role || "Role not specified"}</p></div><StatusBadge status={item.status} /></div>
+              {item.note && <p className="rounded-lg bg-[#FCE8E6] px-3 py-2 text-xs leading-5 text-[#B3261E]">{item.note}</p>}
               <div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-[#5F6368]">Submitted</p><p className="mt-1">{formatDate(item.submitted_at)}</p></div><div><p className="text-xs text-[#5F6368]">Reference</p><p className="mt-1 truncate" title={item.reference_number || ""}>{item.reference_number || "—"}</p></div></div>
               <div className="flex flex-wrap gap-2">
                 {CAN_FILL.includes(item.status) && item.apply_method !== "none" && <button onClick={() => fill(item.application_id, item.apply_method)} disabled={!!busy} className="rounded-full bg-[#0B57D0] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{item.apply_method === "email" ? "Prepare email" : "Fill form"}</button>}

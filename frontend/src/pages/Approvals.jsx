@@ -44,7 +44,9 @@ export default function Approvals({ userId, onDecided }) {
       const result = await api.decide(item.approval_id, decision);
       await load();
       onDecided?.();
-      setMsg(`Decision saved. Application status: ${result.application_status}.`);
+      const bad = result.application_status === "needs_attention";
+      if (bad) setError(result.message || "This application needs attention.");
+      else setMsg(result.message || `Decision saved. Status: ${result.application_status}.`);
     } catch (e) {
       setError(`Could not update approval: ${e.message}`);
     } finally {
@@ -64,7 +66,7 @@ export default function Approvals({ userId, onDecided }) {
     <div className="space-y-6">
       <div><p className="text-sm font-medium text-[#5F6368]">Your decision matters</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#202124] sm:text-3xl">Approvals</h1><p className="mt-2 text-sm text-[#5F6368]">Review every document and submission before it leaves your account.</p></div>
       <StatusMessage message={error || msg} error={!!error} />
-      {busy && <div className="rounded-xl bg-[#E8F0FE] px-4 py-3 text-sm text-[#0B57D0]">Working on your decision...</div>}
+      {busy && <div className="rounded-xl bg-[#E8F0FE] px-4 py-3 text-sm text-[#0B57D0]">Working on it. Submitting to a real website can take up to a minute, please wait...</div>}
       {items.length === 0 && !error ? <EmptyState title="All caught up" description="New documents and application submissions will appear here for your review." /> : (
         <div className="space-y-5">
           {items.map((item) => item.kind === "submission" ? (

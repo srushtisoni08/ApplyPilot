@@ -54,6 +54,7 @@ export const api = {
   markApplied: (appId) => req(`/applications/${appId}/mark-applied`, { method: "POST" }),
   runAgent: (autoPrepare) => req(`/agent/run?auto_prepare=${autoPrepare}`, { method: "POST" }),
   activity: () => req("/agent/activity"),
+  agentStatus: () => req("/agent/status"),
   replies: (id) => req(`/replies/${id}`),
   checkReplies: () => req("/replies/check", { method: "POST" }),
 };

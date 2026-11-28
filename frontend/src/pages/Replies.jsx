@@ -53,6 +53,11 @@ export default function Replies({ userId, search = "" }) {
 
   return (
     <div className="space-y-5">
+      <div>
+        <p className="text-sm font-medium text-[#5F6368]">Track your applications</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#202124] sm:text-3xl">Replies</h1>
+        <p className="mt-2 text-sm text-[#5F6368]">Email responses from employers about submitted applications.</p>
+      </div>
       <section className="rounded-2xl border border-[#DADCE0] bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

@@ -49,7 +49,11 @@ export function StatusBadge({ status }) {
     rejected: "bg-[#F1F3F4] text-[#5F6368]",
     offer: "bg-[#E6F4EA] text-[#137333]",
   };
-  const label = (status || "draft").replaceAll("_", " ");
+  const labels = {
+    awaiting_approval: "Review resume", awaiting_submit: "Approve submission", needs_attention: "Needs attention",
+    submitting: "Submitting...", ready: "Ready to fill", rejected: "Rejected", interview: "Interview", offer: "Offer",
+  };
+  const label = labels[status] || (status || "draft").replaceAll("_", " ");
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${styles[status] || styles.draft}`}>{label}</span>;
 }
 

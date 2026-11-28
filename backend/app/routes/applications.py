@@ -18,6 +18,9 @@ from app.security import get_current_user, require_owner
 from app.agent.permissions import assert_submit_approved
 from app.services.prepare import PrepareError, prepare_application
 
+NOT_CONFIRMED = ("NOT confirmed. The form was submitted but no confirmation page was detected, or the browser step failed. "
+                 "Do not assume it was sent: check the company site or your email, then use 'Mark applied' or 'Fill form' again.")
+
 router = APIRouter(tags=["applications"])
 
 
@@ -98,14 +101,25 @@ def _approve_email(db: Session, a: Approval, app: Application, opp: Opportunity)
         audit(db, opp.user_id, "apply.send_email", {"application_id": app.id},
               {"error": str(exc)[:200]}, approved_by="user", status="error")
         db.commit()
-        return {"decision": "approved", "application_status": app.status}
+        return {"decision": "approved", "application_status": app.status,
+                "message": "The email could not be sent. Nothing was delivered. Check Gmail permissions, then prepare it again."}
     app.status = "submitted"
     app.submitted_at = datetime.now()
     app.reference_number = f"gmail:{msg_id}"
     audit(db, opp.user_id, "apply.send_email", {"application_id": app.id},
           {"to": em["to"], "gmail_id": msg_id}, approved_by="user")
     db.commit()
-    return {"decision": "approved", "application_status": app.status}
+    return {"decision": "approved", "application_status": app.status, "message": "Email sent from your Gmail."}
+
+
+def _outcome(app: Application, a: Approval) -> str:
+    if a.kind == "resume":
+        return "Resume approved. You can now fill the application." if a.decision == "approved" else "Resume rejected. Prepare it again when ready."
+    if a.decision == "rejected":
+        return "Submission cancelled. Nothing was sent."
+    if app.status == "submitted":
+        return f"Submitted and confirmed by the website{' (ref ' + app.reference_number + ')' if app.reference_number else ''}."
+    return NOT_CONFIRMED
 
 
 @router.post("/approvals/{approval_id}/decide")
@@ -163,7 +177,7 @@ def decide(
             audit(db, opp.user_id, "apply.submit", {"application_id": app.id},
                   {"error": str(exc)[:200]}, approved_by="user", status="error")
         db.commit()
-    return {"decision": a.decision, "application_status": app.status}
+    return {"decision": a.decision, "application_status": app.status, "message": _outcome(app, a)}
 
 
 @router.get("/applications/{app_id}/file/{ext}")

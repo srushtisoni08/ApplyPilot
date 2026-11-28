@@ -127,7 +127,8 @@ def run_matching(db: Session, user_id: int, force: bool = False) -> dict:
     profile = prow.data
 
     opps = db.scalars(select(Opportunity).where(Opportunity.user_id == user_id)).all()
-    done = set(db.scalars(select(Match.opportunity_id)).all())
+    opp_ids = [o.id for o in opps]
+    done = set(db.scalars(select(Match.opportunity_id).where(Match.opportunity_id.in_(opp_ids))).all())
     todo = [o for o in opps if force or o.id not in done]
     out = {"profile_confirmed": prow.confirmed, "matched": [], "errors": []}
     if not todo:

@@ -1,14 +1,14 @@
 import { useState } from "react";
 import {
-  BriefcaseBusiness, CheckCheck, ChevronLeft, ChevronRight, LayoutDashboard,
-  LogOut, Menu, Search, Settings, UserRound, X, Bell, Activity,Mail
+  BriefcaseBusiness, CheckCheck, ChevronLeft, ChevronRight, ClipboardList, LayoutDashboard,
+  LogOut, Menu, Search, Settings, UserRound, X, Bell, Activity, Mail
 } from "lucide-react";
 
 const LINKS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "opportunities", label: "Opportunities", icon: BriefcaseBusiness },
   { id: "approvals", label: "Approvals", icon: CheckCheck },
-  { id: "applications", label: "Applications", icon: BriefcaseBusiness },
+  { id: "applications", label: "Applications", icon: ClipboardList },
   { id: "replies", label: "Replies", icon: Mail },
   { id: "profile", label: "My Profile", icon: UserRound },
   { id: "activity", label: "Activity", icon: Activity },
@@ -69,7 +69,9 @@ export function Header({ user, gmailConnected, pending, search, onSearch, onNavi
         <div className="relative">
           <button onClick={() => setProfileOpen(!profileOpen)} aria-label="Open profile menu" aria-expanded={profileOpen} className="grid h-10 w-10 place-items-center rounded-full bg-[#0B57D0] text-sm font-semibold text-white hover:shadow-md">{initials}</button>
           {profileOpen && (
-            <div className="absolute right-0 top-12 z-30 w-64 rounded-2xl border border-[#DADCE0] bg-white p-3 shadow-lg">
+            <>
+              <button aria-hidden="true" className="fixed inset-0 z-20" onClick={() => setProfileOpen(false)} />
+              <div className="absolute right-0 top-12 z-30 w-64 rounded-2xl border border-[#DADCE0] bg-white p-3 shadow-lg">
               <div className="border-b border-[#E8EAED] px-3 pb-3">
                 <p className="font-medium text-[#202124]">{user?.full_name || "Your account"}</p>
                 <p className="mt-1 truncate text-sm text-[#5F6368]">{user?.email}</p>
@@ -77,7 +79,8 @@ export function Header({ user, gmailConnected, pending, search, onSearch, onNavi
               <button onClick={() => { onNavigate("profile"); setProfileOpen(false); }} className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[#444746] hover:bg-[#F1F3F4]"><UserRound className="h-4 w-4" />My Profile</button>
               <button onClick={() => { onNavigate("settings"); setProfileOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[#444746] hover:bg-[#F1F3F4]"><Settings className="h-4 w-4" />Settings</button>
               <button onClick={onLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[#B3261E] hover:bg-[#FCE8E6]"><LogOut className="h-4 w-4" />Log out</button>
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>

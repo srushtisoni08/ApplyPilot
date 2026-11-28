@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 from app.agent.orchestrator import run_cycle
 from app.models.db import get_db
 from app.models.tables import AuditLog, User
-from app.security import get_current_user, require_key
+from app.config import settings
+from app.security import get_current_user
 from app.agent.orchestrator import report_lines, run_cycle
 
 router = APIRouter(tags=["agent"])
-n8n_router = APIRouter(prefix="/automation", tags=["automation"], dependencies=[Depends(require_key)])
 
 
 @router.post("/agent/run")
@@ -39,15 +39,18 @@ def activity(
     ]
 
 
-@n8n_router.post("/agent/{user_id}")
-def run_agent_for_n8n(user_id: int, auto_prepare: bool = False, db: Session = Depends(get_db)):
-    """For n8n: runs one cycle and returns count + message for the Telegram node."""
-    user = db.get(User, user_id)
-    if not user:
-        raise HTTPException(404, "User not found")
-    report = run_cycle(db, user, auto_prepare)
-    lines = report_lines(report)
-
-    for a in (report["state"] or {}).get("needs_attention", []):
-        lines.append(f"Needs attention: {a['company']} - {a['role']}")
-    return {"count": len(lines), "message": "\n".join(lines), "blocked": report["blocked"]} 
+@router.get("/agent/status")
+def agent_status(current_user: User = Depends(get_current_user)):
+    """Read-only view of the background scheduler (configured in .env.local)."""
+    from app.services.notify import telegram_configured
+    return {
+        "scheduler_enabled": settings.SCHEDULER_ENABLED,
+        "agent_interval_min": settings.AGENT_INTERVAL_MIN,
+        "replies_interval_min": settings.REPLIES_INTERVAL_MIN,
+        "deadline_hour": settings.DEADLINE_HOUR,
+        "deadline_days": settings.DEADLINE_DAYS,
+        "discovery_enabled": settings.DISCOVERY_ENABLED,
+        "discovery_interval_hours": settings.DISCOVERY_INTERVAL_HOURS,
+        "auto_prepare": settings.SCHEDULER_AUTO_PREPARE,
+        "telegram_configured": telegram_configured(),
+    }

@@ -1,4 +1,4 @@
-"""Built-in scheduler (replaces the n8n workflows). Runs inside the FastAPI process."""
+"""Built-in scheduler. Runs inside the FastAPI process."""
 import logging
 import sys
 import time

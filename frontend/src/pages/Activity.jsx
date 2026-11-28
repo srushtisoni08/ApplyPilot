@@ -47,6 +47,11 @@ export default function Activity() {
   const card = "rounded-2xl border border-[#DADCE0] bg-white p-5";
   return (
     <div className="space-y-6">
+      <div>
+        <p className="text-sm font-medium text-[#5F6368]">System logs and AI actions</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#202124] sm:text-3xl">Activity</h1>
+        <p className="mt-2 text-sm text-[#5F6368]">Audit log of every action taken and what was approved.</p>
+      </div>
       <section className={card}>
         <h2 className="text-lg font-semibold">AI agent</h2>
         <p className="mt-1 text-sm text-[#5F6368]">
