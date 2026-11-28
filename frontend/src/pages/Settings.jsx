@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { api } from "../api";
 import { StatusMessage } from "../components/UI";
+import { PasswordField } from "../components/Fields";
 
 const every = (min) => (min % 60 === 0 ? `every ${min / 60} h` : `every ${min} min`);
 
@@ -91,8 +92,8 @@ export default function Settings({ user, gmailConnected, onUserUpdate }) {
           <div className="border-t border-[#E8EAED] pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-[#202124]"><KeyRound className="h-4 w-4" />Change password</h3>
             <div className="mt-3 grid gap-3">
-              <input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} placeholder="Current password (optional for Gmail-only accounts)" className="rounded-xl border border-[#DADCE0] px-3.5 py-2.5 text-sm outline-none focus:border-[#0B57D0]" />
-              <input type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="New password (at least 8 characters)" className="rounded-xl border border-[#DADCE0] px-3.5 py-2.5 text-sm outline-none focus:border-[#0B57D0]" />
+              <PasswordField label="Current password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} hint="Leave blank for Gmail-only accounts" />
+              <PasswordField label="New password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} hint="At least 8 characters" />
               <button onClick={changePassword} disabled={!!busy || newPassword.length < 8} className="w-fit rounded-full border border-[#DADCE0] px-4 py-2 text-sm font-semibold text-[#444746] hover:bg-[#F1F3F4] disabled:opacity-50">Update password</button>
             </div>
           </div>

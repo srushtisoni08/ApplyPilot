@@ -1,21 +1,116 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- Design tokens ----------
+   Every surface/text colour comes from these variables, so light and dark mode
+   switch in one place (the .dark block). Use classes like bg-surface, text-ink,
+   border-line, text-brand instead of hard-coded hex values. */
 :root {
-  font-family: Arial, Helvetica, sans-serif;
-  color: #202124;
-  background: #f6f8fc;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  color-scheme: light;
+  --canvas: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --ink: #101828;
+  --muted: #475467;
+  --faint: #98a2b3;
+  --line: #e4e7ec;
+  --brand: #2563eb;
+  --brand-solid: #2563eb;
+  --brand-strong: #1d4ed8;
+  --brand-bg: #e3ecff;
+  --accent: #8b6cf0;
+  --accent-bg: #ede9fe;
+  --ok: #16a34a;
+  --ok-bg: #dcfce7;
+  --warn: #d97706;
+  --warn-bg: #fef3c7;
+  --bad: #dc2626;
+  --bad-bg: #fee2e2;
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-md: 0 6px 16px -4px rgb(16 24 40 / 0.1), 0 2px 4px -2px rgb(16 24 40 / 0.06);
+  --shadow-lg: 0 24px 48px -12px rgb(16 24 40 / 0.22);
 }
 
+.dark {
+  color-scheme: dark;
+  --canvas: #0b1120;
+  --surface: #121a2e;
+  --surface-2: #1a2440;
+  --ink: #f2f4f7;
+  --muted: #a4adbf;
+  --faint: #667085;
+  --line: #243049;
+  --brand: #6b9cf5;
+  --brand-solid: #2563eb;
+  --brand-strong: #3b73f0;
+  --brand-bg: #1a2a55;
+  --accent: #b9a4fb;
+  --accent-bg: #2b2250;
+  --ok: #4ade80;
+  --ok-bg: #11301f;
+  --warn: #fbbf24;
+  --warn-bg: #3a2a0c;
+  --bad: #f87171;
+  --bad-bg: #3b1616;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 6px 16px -4px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 24px 48px -12px rgb(0 0 0 / 0.6);
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-solid: var(--brand-solid);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-bg: var(--brand-bg);
+  --color-accent: var(--accent);
+  --color-accent-bg: var(--accent-bg);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --shadow-card: var(--shadow-sm);
+  --shadow-lift: var(--shadow-md);
+  --shadow-pop: var(--shadow-lg);
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ---------- Base ---------- */
 * {
   box-sizing: border-box;
+}
+
+html {
+  background: var(--canvas);
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
 }
 
 button,
@@ -33,7 +128,80 @@ button:disabled {
   cursor: not-allowed;
 }
 
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
 ::selection {
-  color: #001d35;
-  background: #d3e3fd;
+  background: color-mix(in srgb, var(--brand) 28%, transparent);
+}
+
+/* ---------- Small helpers ---------- */
+@utility card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--surface-2);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 7%, transparent), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes route-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.route-flow {
+  stroke-dasharray: 3 7;
+  animation: route-flow 1.6s linear infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.pulse-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse-ring 2.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
