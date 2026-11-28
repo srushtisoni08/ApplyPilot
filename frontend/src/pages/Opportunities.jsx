@@ -71,7 +71,8 @@ function MetaChips({ item }) {
     </div>
   );
 }
-
+const APPLIED = ["submitted", "interview", "offer", "rejected"];
+const canPrepare = (item) => item.category !== "unsuitable" && !APPLIED.includes(item.application_status);
 function OpportunityCard({ item, index, busy, onOpen, onPrepare }) {
   return (
     <motion.article
@@ -92,7 +93,9 @@ function OpportunityCard({ item, index, busy, onOpen, onPrepare }) {
       <div className="mt-4"><MetaChips item={item} /></div>
       {item.explanation && <p className="mt-4 line-clamp-2 text-sm leading-6 text-muted">{item.explanation}</p>}
       <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-4 mt-5">
-        {item.category !== "unsuitable" && <Button size="sm" onClick={() => onPrepare(item.opportunity_id)} disabled={!!busy}>Prepare application</Button>}
+        {canPrepare(item)
+          ? <Button size="sm" onClick={() => onPrepare(item.opportunity_id)} disabled={!!busy}>Prepare application</Button>
+          : APPLIED.includes(item.application_status) && <span className="text-xs font-medium text-muted">Already {item.application_status}</span>}
         <Button size="sm" variant="ghost" className="ml-auto" onClick={() => onOpen(item)}><Sparkles className="h-4 w-4" />Details</Button>
       </div>
     </motion.article>
@@ -115,7 +118,9 @@ function OpportunityRow({ item, index, busy, onOpen, onPrepare }) {
       </button>
       <div className="hidden md:block"><MetaChips item={item} /></div>
       <div className="flex items-center gap-2">
-        {item.category !== "unsuitable" && <Button size="sm" onClick={() => onPrepare(item.opportunity_id)} disabled={!!busy}>Prepare</Button>}
+        {canPrepare(item)
+          ? <Button size="sm" onClick={() => onPrepare(item.opportunity_id)} disabled={!!busy}>Prepare</Button>
+          : APPLIED.includes(item.application_status) && <span className="text-xs font-medium text-muted">Already {item.application_status}</span>}
         <Button size="sm" variant="secondary" onClick={() => onOpen(item)}>Details</Button>
       </div>
     </motion.li>
@@ -180,10 +185,14 @@ function DetailDrawer({ item, busy, onClose, onPrepare }) {
         </div>
 
         <footer className="flex gap-2 border-t border-line p-4 sm:p-5">
-          {item.category !== "unsuitable" ? (
+          {canPrepare(item) ? (
             <Button className="flex-1" onClick={() => onPrepare(item.opportunity_id)} disabled={!!busy}>Prepare application</Button>
           ) : (
-            <p className="flex-1 self-center text-sm text-muted">This role was marked unsuitable for your profile.</p>
+            <p className="flex-1 self-center text-sm text-muted">
+              {APPLIED.includes(item.application_status)
+                ? `You already applied to this role (${item.application_status}).`
+                : "This role was marked unsuitable for your profile."}
+            </p>
           )}
           <Button variant="secondary" onClick={onClose}>Close</Button>
         </footer>

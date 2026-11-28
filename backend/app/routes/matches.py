@@ -7,6 +7,7 @@ from app.models.tables import Match, Opportunity, User
 from app.security import get_current_user, require_owner
 from app.services.apply_target import classify_apply_target
 from app.services.matching import run_matching
+from app.models.tables import Application, Match, Opportunity, User
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
@@ -33,8 +34,9 @@ def list_matches(
 ):
     require_owner(user_id, current_user)
     rows = db.execute(
-        select(Opportunity, Match)
+        select(Opportunity, Match, Application)
         .join(Match, Match.opportunity_id == Opportunity.id)
+        .outerjoin(Application, Application.opportunity_id == Opportunity.id)
         .where(Opportunity.user_id == current_user.id)
         .order_by(Match.score.desc(), Opportunity.deadline.asc().nulls_last())
     ).all()
@@ -44,6 +46,7 @@ def list_matches(
             "deadline": o.deadline, "apply_link": o.apply_link,
             "apply_method": classify_apply_target(o.apply_link)["method"],
             "score": m.score, "category": m.category, "explanation": m.explanation,
+            "application_status": a.status if a else None,
         }
-        for o, m in rows
+        for o, m, a in rows
     ]

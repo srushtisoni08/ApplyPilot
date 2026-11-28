@@ -21,15 +21,31 @@ def _seen(db: Session, email_id: str) -> bool:
     )) is not None
 
 
-def check_replies(db: Session, user: User) -> list[dict]:
-    """Looks at the last 3 days of mail, links emails to submitted applications by company name,
-    classifies them with the LLM, and updates the application status."""
-    apps = db.execute(
-        select(Application, Opportunity)
-        .join(Opportunity, Application.opportunity_id == Opportunity.id)
-        .where(Opportunity.user_id == user.id, Application.status.in_(TRACKED))
+STRONG = ("offer", "interview", "rejection")  # clear proof the person applied and the company answered
+FINAL = ("offer", "rejected")
+
+
+def _candidates(db: Session, user: User) -> list[tuple]:
+    """(application or None, opportunity). Tracked applications come first, then every other
+    opportunity, so a reply is found even if the user applied on the company site by themselves."""
+    rows = db.execute(
+        select(Opportunity, Application)
+        .outerjoin(Application, Application.opportunity_id == Opportunity.id)
+        .where(Opportunity.user_id == user.id)
+        .order_by(Opportunity.id.desc())
     ).all()
-    if not apps:
+    tracked = [(a, o) for o, a in rows if a and a.status in TRACKED]
+    others = [(a, o) for o, a in rows if not (a and a.status in TRACKED + FINAL)]
+    return tracked + others
+
+
+def check_replies(db: Session, user: User) -> list[dict]:
+    """Looks at the last 3 days of mail and links each email to an application by company name.
+    The LLM classifies it and the application status is updated. If you applied outside ApplyPilot
+    (no application yet) and the company answers with an interview, offer or rejection, the
+    application is created as submitted so the reply is tracked."""
+    cands = _candidates(db, user)
+    if not cands:
         return []
 
     updates = []
@@ -38,7 +54,8 @@ def check_replies(db: Session, user: User) -> list[dict]:
             continue
         text = f"Subject: {e['subject']}\nFrom: {e['sender']}\n\n{e['body']}"
         hay = text[:3000].lower()
-        hit = next(((a, o) for a, o in apps if o.company and o.company.lower() in hay), None)
+        hit = next(((a, o) for a, o in cands
+                    if o.company and o.company.lower() in hay and o.source_email_id != e["id"]), None)
         if not hit:
             continue
         a, o = hit
@@ -56,7 +73,22 @@ def check_replies(db: Session, user: User) -> list[dict]:
             db.rollback()
             break  # LLM unavailable: stop, the next scheduled run retries (email not marked as seen)
         cat = c.category if c.category in ("offer", "interview", "rejection", "received", "other") else "other"
-        audit(db, user.id, "reply.classify", {"email_id": e["id"], "application_id": a.id}, {
+
+        tracked = a is not None and a.status in TRACKED
+        if not tracked and cat in STRONG:  # applied outside ApplyPilot: start tracking now
+            if a is None:
+                a = Application(opportunity_id=o.id, idempotency_key=f"{user.id}:{o.id}", status="submitted")
+                db.add(a)
+                db.flush()
+            else:
+                a.status = "submitted"
+            a.submitted_at = a.submitted_at or datetime.now()
+            audit(db, user.id, "apply.auto_tracked", {"application_id": a.id},
+                  {"reason": f"{cat} email received from {o.company}"})
+            tracked = True
+
+        audit(db, user.id, "reply.classify",
+              {"email_id": e["id"], "application_id": a.id if tracked else None}, {
             "category": cat,
             "reason": str(getattr(c, "reason", "") or "")[:300],
             "subject": e["subject"][:200],
@@ -65,12 +97,12 @@ def check_replies(db: Session, user: User) -> list[dict]:
             "snippet": re.sub(r"\s+", " ", e["body"]).strip()[:500],
         })
         new = {"offer": "offer", "interview": "interview", "rejection": "rejected"}.get(cat)
-        if new and a.status != new and a.status not in ("rejected", "offer"):
+        if tracked and new and a.status != new and a.status not in FINAL:
             a.status = new
             updates.append({"company": o.company, "role": o.role, "status": new, "subject": e["subject"][:80]})
+            cands = [x for x in cands if x[1].id != o.id]  # one update per application per run
         db.commit()
     return updates
-
 
 def deadlines_soon(db: Session, user_id: int, days: int) -> list[dict]:
     today = date.today()

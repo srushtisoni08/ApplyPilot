@@ -62,8 +62,8 @@ def plan(obs: dict, phase: str, auto_prepare: bool, max_prepare: int) -> list[di
             steps.append(_step("scan_inbox", {}, "Check the inbox for new job emails"))
         if obs["gmail_connected"] or obs["unmatched"]:
             steps.append(_step("score_opportunities", {}, "Score opportunities that have no match yet"))
-        if obs["gmail_connected"] and obs["tracked"]:
-            steps.append(_step("check_replies", {}, f"Look for replies to {obs['tracked']} submitted application(s)"))
+        if obs["gmail_connected"]:
+            steps.append(_step("check_replies", {}, "Look for replies from companies you applied to"))
     elif phase == "draft" and auto_prepare:
         for oid in obs["to_prepare"][:max_prepare]:
             steps.append(_step("prepare_documents", {"opportunity_id": oid},
