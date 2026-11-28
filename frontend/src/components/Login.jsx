@@ -65,7 +65,7 @@ export default function Login({ onLogin, onRegister }) {
       </p>
       <div className="mt-6 border-t pt-5 text-center">
         <a href={`${api.base}/auth/google`} className="text-sm font-medium text-slate-600 hover:text-blue-700">
-          Restore an existing Gmail-connected account
+          Sign in with Google
         </a>
       </div>
     </AuthLayout>

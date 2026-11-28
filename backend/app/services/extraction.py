@@ -15,6 +15,11 @@ KEYWORDS = re.compile(
     re.I,
 )
 
+REPLY_SUBJECT = re.compile(
+    r"interview (invitation|scheduled|confirmation)|application (received|status|update)|not (been )?selected|unfortunately|regret to",
+    re.I,
+)
+
 MAX_ERRORS = 3  # stop a run early if the LLM keeps failing (e.g. rate limit)
 
 
@@ -65,6 +70,9 @@ def process_emails(db: Session, user: User, n: int = 20, since=None) -> dict:
             continue
 
         text = f"Subject: {e['subject']}\nFrom: {e['sender']}\n\n{e['body']}"
+        if REPLY_SUBJECT.search(e["subject"] or ""):        # replies to applications are not new jobs
+            stats["not_opportunity"] += 1
+            continue
         if not KEYWORDS.search(text):                       # layer 1: free
             stats["keyword_skip"] += 1
             continue

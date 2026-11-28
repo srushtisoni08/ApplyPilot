@@ -20,7 +20,7 @@ uvicorn app.main:app --reload
 cd ../frontend
 npm install && npm run dev        # http://localhost:5173
 ```
-Google Cloud: enable Gmail API, create OAuth credentials, redirect URI `http://localhost:8000/auth/callback`, add teammates as test users. Scopes: gmail.readonly + gmail.send (send is used only for approved email applications).
+Google Cloud: enable Gmail API, create OAuth credentials, redirect URI `http://localhost:8000/auth/callback`, add teammates as test users. Users can sign in with Google when their Google/Gmail address matches their ApplyPilot account email. Scopes: gmail.readonly + gmail.send (send is used only for approved email applications).
 
 ## Background automation
 Set in `.env.local`: `SCHEDULER_ENABLED=true`, `SCHEDULER_USER_IDS`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (and `DISCOVERY_ENABLED=true`). Test:

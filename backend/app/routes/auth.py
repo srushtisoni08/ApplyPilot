@@ -208,10 +208,12 @@ def callback(code: str, state: str, request: Request, db: Session = Depends(get_
             raise HTTPException(409, "A different Gmail account is already connected. Contact support to change it.")
     else:
         user = db.scalar(select(User).where(func.lower(User.email) == email))
-        if not user or user.password_hash is not None:
+        if not user:
             raise HTTPException(400, "Log in to ApplyPilot before connecting this Gmail account.")
         if not user.is_active:
             raise HTTPException(401, "This account is inactive")
+        if user.gmail_email and user.gmail_email.lower() != email:
+            raise HTTPException(409, "A different Gmail account is already connected. Log in to ApplyPilot first.")
 
     linked_elsewhere = db.scalar(
         select(User).where(func.lower(User.gmail_email) == email, User.id != user.id)
