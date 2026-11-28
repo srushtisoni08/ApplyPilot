@@ -1,14 +1,66 @@
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Trash2, TriangleAlert } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { api } from "../api";
-import { ConfirmationModal, EmptyState, LoadingState, StatusBadge, StatusMessage } from "../components/UI";
+import { Button, ConfirmationModal, EmptyState, LoadingState, StatusBadge, StatusMessage } from "../components/UI";
 
 const CAN_FILL = ["ready", "needs_attention", "awaiting_submit"];
+
+const TABS = [
+  { key: "all", label: "All", match: () => true },
+  { key: "active", label: "In progress", match: (s) => ["draft", "awaiting_approval", "ready", "awaiting_submit", "submitting"].includes(s) },
+  { key: "sent", label: "Sent", match: (s) => ["submitted", "interview", "offer"].includes(s) },
+  { key: "attention", label: "Needs attention", match: (s) => s === "needs_attention" },
+  { key: "closed", label: "Rejected", match: (s) => s === "rejected" },
+];
+
+/* Where an application is on its way. Five steps, so the row shows progress without a chart. */
+const STEPS = ["draft", "awaiting_approval", "ready", "awaiting_submit", "submitted"];
+function stepIndex(status) {
+  if (["interview", "offer", "rejected"].includes(status)) return STEPS.length;
+  if (status === "submitting") return 4;
+  const i = STEPS.indexOf(status);
+  return i < 0 ? 0 : i + 1;
+}
+
+function Progress({ status }) {
+  const done = stepIndex(status);
+  const bad = status === "needs_attention";
+  return (
+    <div className="flex items-center gap-1" role="img" aria-label={`Step ${Math.min(done, STEPS.length)} of ${STEPS.length}`}>
+      {STEPS.map((s, i) => (
+        <span key={s} className={`h-1.5 w-5 rounded-full ${i < done ? (bad ? "bg-bad" : status === "rejected" ? "bg-faint" : "bg-brand-solid") : "bg-surface-2"}`} />
+      ))}
+    </div>
+  );
+}
+
 const formatDate = (value) => {
-  if (!value) return "—";
+  if (!value) return "";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value).slice(0, 10) : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? String(value).slice(0, 10) : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 };
+
+function Actions({ item, busy, onFill, onMark, onDelete }) {
+  const canFill = CAN_FILL.includes(item.status);
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {canFill && item.apply_method !== "none" && (
+        <Button size="sm" onClick={() => onFill(item.application_id, item.apply_method)} disabled={!!busy}>{item.apply_method === "email" ? "Prepare email" : "Fill form"}</Button>
+      )}
+      {canFill && <Button size="sm" variant="secondary" onClick={() => onMark(item)} disabled={!!busy}>Mark applied</Button>}
+      {canFill && item.apply_method === "none" && <span className="text-xs text-warn">No automatic method. Apply by hand.</span>}
+      <button
+        onClick={() => onDelete(item)}
+        disabled={!!busy || item.status === "submitting"}
+        title={item.status === "submitting" ? "A submission is in progress" : "Delete application"}
+        aria-label={`Delete application for ${item.company || item.role || "this job"}`}
+        className="grid h-8 w-8 place-items-center rounded-lg text-faint transition-colors hover:bg-bad-bg hover:text-bad disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
 
 export default function Applications({ userId, onFilled, search = "" }) {
   const [rows, setRows] = useState([]);
@@ -19,6 +71,7 @@ export default function Applications({ userId, onFilled, search = "" }) {
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [tab, setTab] = useState("all");
 
   const load = async () => {
     try {
@@ -32,16 +85,10 @@ export default function Applications({ userId, onFilled, search = "" }) {
   };
   useEffect(() => {
     let active = true;
-    api.applications(userId).then((applications) => {
-      if (active) {
-        setRows(applications);
-        setError("");
-      }
-    }).catch((e) => {
-      if (active) setError(`Could not load applications: ${e.message}`);
-    }).finally(() => {
-      if (active) setLoading(false);
-    });
+    api.applications(userId)
+      .then((applications) => { if (active) { setRows(applications); setError(""); } })
+      .catch((e) => { if (active) setError(`Could not load applications: ${e.message}`); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [userId]);
 
@@ -99,57 +146,73 @@ export default function Applications({ userId, onFilled, search = "" }) {
     }
   };
 
-  const visibleRows = useMemo(() => {
+  const searched = useMemo(() => {
     const query = search.trim().toLowerCase();
     return rows.filter((item) => `${item.company || ""} ${item.role || ""} ${item.status || ""} ${item.reference_number || ""}`.toLowerCase().includes(query));
   }, [rows, search]);
+
+  const visibleRows = useMemo(() => searched.filter((r) => TABS.find((t) => t.key === tab).match(r.status)), [searched, tab]);
 
   if (loading) return <LoadingState label="Loading your applications..." />;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div><p className="text-sm font-medium text-[#5F6368]">Keep everything in one place</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#202124] sm:text-3xl">Applications</h1><p className="mt-2 text-sm text-[#5F6368]">Track each application from preparation through submission.</p></div>
-        <label className="flex items-center gap-2 text-sm text-[#5F6368]"><input type="checkbox" checked={watch} onChange={(event) => setWatch(event.target.checked)} className="h-4 w-4 accent-[#0B57D0]" />Show browser while filling</label>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Applications</h1>
+          <p className="mt-2 text-sm text-muted">Everything you've started, and how far along it is.</p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
+          <input type="checkbox" checked={watch} onChange={(e) => setWatch(e.target.checked)} className="h-4 w-4 accent-[var(--brand-solid)]" />
+          Show the browser while filling
+        </label>
       </div>
-      {busy && <div className="rounded-xl bg-[#E8F0FE] px-4 py-3 text-sm text-[#0B57D0]">{busy}</div>}
+
+      {busy && <div role="status" className="rounded-xl bg-brand-bg px-4 py-3 text-sm text-brand">{busy}</div>}
       <StatusMessage message={error || msg} error={!!error} />
-      {rows.length === 0 && !error ? <EmptyState title="No applications yet" description="Start preparing an application from one of your opportunities. Your progress will appear here." /> : visibleRows.length === 0 ? <EmptyState title="No matching applications" description="Try a different search or clear the search field." /> : (
-        <div className="overflow-hidden rounded-2xl border border-[#DADCE0] bg-white shadow-sm">
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[#F8F9FA] text-xs font-semibold uppercase tracking-wide text-[#5F6368]"><tr><th className="px-5 py-4">Company / role</th><th className="px-4 py-4">Status</th><th className="px-4 py-4">Submitted</th><th className="px-4 py-4">Reference</th><th className="px-5 py-4 text-right">Actions</th></tr></thead>
-              <tbody className="divide-y divide-[#E8EAED]">
-                {visibleRows.map((item) => <tr key={item.application_id} className="hover:bg-[#FAFBFF]">
-                  <td className="px-5 py-4"><p className="font-semibold text-[#202124]">{item.company || "Company not specified"}</p><p className="mt-1 text-[#5F6368]">{item.role || "Role not specified"}</p></td>
-                  <td className="px-4 py-4"><StatusBadge status={item.status} />{item.note && <p className="mt-2 max-w-64 text-xs leading-5 text-[#B3261E]">{item.note}</p>}</td>
-                  <td className="px-4 py-4 text-[#5F6368]">{formatDate(item.submitted_at)}</td>
-                  <td className="max-w-48 truncate px-4 py-4 text-[#5F6368]" title={item.reference_number || ""}>{item.reference_number || "—"}</td>
-                  <td className="px-5 py-4"><div className="flex justify-end gap-2">
-                    {CAN_FILL.includes(item.status) && item.apply_method !== "none" && <button onClick={() => fill(item.application_id, item.apply_method)} disabled={!!busy} className="rounded-full bg-[#0B57D0] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#0842A0] disabled:opacity-50">{item.apply_method === "email" ? "Prepare email" : "Fill form"}</button>}
-                    {CAN_FILL.includes(item.status) && <button onClick={() => setConfirming(item)} disabled={!!busy} className="rounded-full border border-[#DADCE0] px-3.5 py-2 text-xs font-semibold text-[#444746] hover:bg-[#F1F3F4] disabled:opacity-50">Mark applied</button>}
-                    <button onClick={() => setDeleting(item)} disabled={!!busy || item.status === "submitting"} title={item.status === "submitting" ? "A submission is in progress" : "Delete application"} aria-label={`Delete application for ${item.company || item.role || "this job"}`} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-[#B3261E] hover:bg-[#FCE8E6] disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-4 w-4" />Delete</button>
-                    {item.apply_method === "none" && CAN_FILL.includes(item.status) && <span className="inline-flex items-center gap-1 text-xs text-[#8D5B00]" title="No supported automatic application method"><TriangleAlert className="h-4 w-4" />Manual apply</span>}
-                  </div></td>
-                </tr>)}
-              </tbody>
-            </table>
+
+      {rows.length === 0 && !error ? (
+        <EmptyState title="No applications yet" description="Prepare one from an opportunity and it will be tracked here." />
+      ) : (
+        <div>
+          <div role="tablist" aria-label="Filter applications" className="flex gap-1 overflow-x-auto border-b border-line">
+            {TABS.map((t) => {
+              const n = searched.filter((r) => t.match(r.status)).length;
+              const on = tab === t.key;
+              return (
+                <button key={t.key} role="tab" aria-selected={on} onClick={() => setTab(t.key)} className={`-mb-px shrink-0 border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${on ? "border-brand-solid text-ink" : "border-transparent text-muted hover:text-ink"}`}>
+                  {t.label} <span className="num ml-1 text-xs text-faint">{n}</span>
+                </button>
+              );
+            })}
           </div>
-          <div className="divide-y divide-[#E8EAED] md:hidden">
-            {visibleRows.map((item) => <article key={item.application_id} className="space-y-4 p-4">
-              <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-semibold text-[#202124]">{item.company || "Company not specified"}</h2><p className="mt-1 text-sm text-[#5F6368]">{item.role || "Role not specified"}</p></div><StatusBadge status={item.status} /></div>
-              {item.note && <p className="rounded-lg bg-[#FCE8E6] px-3 py-2 text-xs leading-5 text-[#B3261E]">{item.note}</p>}
-              <div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-[#5F6368]">Submitted</p><p className="mt-1">{formatDate(item.submitted_at)}</p></div><div><p className="text-xs text-[#5F6368]">Reference</p><p className="mt-1 truncate" title={item.reference_number || ""}>{item.reference_number || "—"}</p></div></div>
-              <div className="flex flex-wrap gap-2">
-                {CAN_FILL.includes(item.status) && item.apply_method !== "none" && <button onClick={() => fill(item.application_id, item.apply_method)} disabled={!!busy} className="rounded-full bg-[#0B57D0] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{item.apply_method === "email" ? "Prepare email" : "Fill form"}</button>}
-                {CAN_FILL.includes(item.status) && <button onClick={() => setConfirming(item)} disabled={!!busy} className="rounded-full border border-[#DADCE0] px-4 py-2 text-xs font-semibold text-[#444746] disabled:opacity-50">Mark applied</button>}
-                {item.apply_method === "none" && CAN_FILL.includes(item.status) && <span className="inline-flex items-center gap-1 text-xs text-[#8D5B00]"><ExternalLink className="h-4 w-4" />Apply manually</span>}
-                <button onClick={() => setDeleting(item)} disabled={!!busy || item.status === "submitting"} title={item.status === "submitting" ? "A submission is in progress" : "Delete application"} aria-label={`Delete application for ${item.company || item.role || "this job"}`} className="inline-flex items-center gap-1 rounded-full border border-[#F2B8B5] px-4 py-2 text-xs font-semibold text-[#B3261E] hover:bg-[#FCE8E6] disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-4 w-4" />Delete</button>
-              </div>
-            </article>)}
-          </div>
+
+          {visibleRows.length === 0 ? (
+            <p className="py-16 text-center text-sm text-muted">{searched.length ? "Nothing in this tab." : "No applications match your search."}</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {visibleRows.map((item) => (
+                <li key={item.application_id} className="grid gap-x-6 gap-y-3 py-5 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] md:items-center">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-ink">{item.company || "Company not specified"}</p>
+                    <p className="truncate text-sm text-muted">{item.role || "Role not specified"}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3"><StatusBadge status={item.status} /><Progress status={item.status} /></div>
+                    <p className="text-xs text-muted">
+                      {item.submitted_at ? `Sent ${formatDate(item.submitted_at)}` : "Not sent yet"}
+                      {item.reference_number && <span className="ml-2 break-all text-faint" title="Reference">{item.reference_number}</span>}
+                    </p>
+                    {item.note && <p className="text-xs leading-5 text-bad">{item.note}</p>}
+                  </div>
+                  <Actions item={item} busy={busy} onFill={fill} onMark={setConfirming} onDelete={setDeleting} />
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
+
       {confirming && <ConfirmationModal title="Mark this application as submitted?" description={`Only confirm if you have already applied to ${confirming.company || "this company"} outside ApplyPilot. This updates its tracking status and does not submit anything.`} confirmLabel="Mark as submitted" onCancel={() => setConfirming(null)} onConfirm={() => markApplied(confirming)} busy={!!busy} />}
       {deleting && <ConfirmationModal title="Delete this application?" description={`This permanently removes the ${deleting.company || deleting.role || "job"} application and its local documents from ApplyPilot, including any pending approvals. It will not withdraw an application already sent to the employer. This cannot be undone.`} confirmLabel="Delete application" onCancel={() => setDeleting(null)} onConfirm={() => deleteApplication(deleting)} busy={!!busy} danger />}
     </div>

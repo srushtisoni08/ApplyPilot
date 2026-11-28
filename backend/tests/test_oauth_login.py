@@ -58,6 +58,17 @@ class OAuthLoginTests(unittest.TestCase):
         auth.set_session_cookie.assert_not_called()
         self.db.commit.assert_not_called()
 
+    def test_google_sign_in_rejects_different_linked_gmail(self):
+        self.user.gmail_email = "another@example.com"
+        self.db.scalar.return_value = self.user
+
+        with self.assertRaises(HTTPException) as raised:
+            auth.callback("oauth-code", "signed-state", self.request, self.db)
+
+        self.assertEqual(raised.exception.status_code, 409)
+        auth.set_session_cookie.assert_not_called()
+        self.db.commit.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

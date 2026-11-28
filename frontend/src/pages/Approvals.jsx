@@ -1,7 +1,107 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, FileText, ShieldCheck } from "lucide-react";
+import { Check, ExternalLink, ShieldAlert } from "lucide-react";
 import { api } from "../api";
-import { ConfirmationModal, EmptyState, LoadingState, StatusMessage } from "../components/UI";
+import { Button, ConfirmationModal, EmptyState, LoadingState, StatusMessage } from "../components/UI";
+
+function Heading({ item, kind }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[13px] text-muted">{kind}</p>
+      <h2 className="mt-0.5 truncate font-display text-lg font-semibold text-ink">{item.role || "Role not specified"}</h2>
+      <p className="truncate text-sm text-muted">{item.company || "Company not specified"}</p>
+    </div>
+  );
+}
+
+function SubmissionReview({ item, working, onDecide }) {
+  const email = item.method === "email";
+  return (
+    <article className="card overflow-hidden border-warn/40">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line p-5 sm:px-6">
+        <Heading item={item} kind="Final review before sending" />
+        <p className="max-w-xs text-[13px] leading-5 text-muted">
+          {email ? "Approving sends the email below from your Gmail account." : "Approving submits this form to the company."} Nothing goes out before then.
+        </p>
+      </div>
+
+      <div className="space-y-5 p-5 sm:p-6">
+        {!email && (
+          <figure className="overflow-hidden rounded-xl border border-line bg-surface-2">
+            <figcaption className="border-b border-line px-4 py-2.5 text-[13px] font-medium text-muted">What the form looks like now</figcaption>
+            <img src={`${api.screenshotUrl(item.application_id)}&t=${item.approval_id}`} alt="Screenshot of the filled application form" crossOrigin="use-credentials" className="max-h-[480px] w-full object-contain object-top" />
+          </figure>
+        )}
+
+        {!!item.preview?.length && (
+          <dl className="divide-y divide-line rounded-xl border border-line">
+            {item.preview.map((p, i) => (
+              <div key={`${p.label}-${i}`} className="grid gap-1 px-4 py-3 sm:grid-cols-[160px_1fr] sm:gap-4">
+                <dt className="text-sm text-muted">{p.label}</dt>
+                <dd className="break-words whitespace-pre-wrap text-sm text-ink">{p.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+          <Button variant="secondary" onClick={() => onDecide(item, "rejected")} disabled={working}>Cancel this one</Button>
+          <Button onClick={() => onDecide(item, "approved")} disabled={working} icon={Check}>{email ? "Approve and send" : "Approve and submit"}</Button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ResumeReview({ item, working, onDecide }) {
+  const passed = !!item.fact_check?.passed;
+  const skills = item.selected?.skills || [];
+  const projects = item.selected?.projects || [];
+  return (
+    <article className="card overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line p-5 sm:px-6">
+        <Heading item={item} kind="Resume and cover letter" />
+        <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${passed ? "text-ok" : "text-bad"}`}>
+          {passed ? <Check className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+          {passed ? "Facts match your profile" : "Fact check found problems"}
+        </span>
+      </div>
+
+      {!passed && (
+        <div className="border-b border-bad/25 bg-bad-bg px-5 py-4 text-sm text-bad sm:px-6">
+          <p className="font-semibold">Fix these before you can approve:</p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5">{(item.fact_check?.issues || []).map((issue, i) => <li key={i}>{issue}</li>)}</ul>
+        </div>
+      )}
+
+      <div className="grid gap-px bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+        <section className="bg-surface p-5 sm:p-6">
+          <h3 className="text-sm font-semibold text-ink">Resume</h3>
+          <p className="mt-1 text-sm text-muted">Open it and read it through before approving.</p>
+          <div className="mt-4 flex flex-col items-start gap-2 text-sm font-medium">
+            <a className="inline-flex items-center gap-1.5 text-brand hover:underline" href={api.fileUrl(item.application_id, "pdf")} target="_blank" rel="noreferrer">Open PDF <ExternalLink className="h-3.5 w-3.5" /></a>
+            <a className="inline-flex items-center gap-1.5 text-brand hover:underline" href={api.fileUrl(item.application_id, "docx")} target="_blank" rel="noreferrer">Download Word file <ExternalLink className="h-3.5 w-3.5" /></a>
+          </div>
+          <div className="mt-6 border-t border-line pt-4">
+            <h3 className="text-sm font-semibold text-ink">Pulled from your profile</h3>
+            <p className="mt-1.5 text-sm leading-6 text-muted">
+              {skills.length ? skills.join(", ") : "No skills selected."}
+              {projects.length > 0 && <><br /><span className="text-ink">Projects:</span> {projects.join(", ")}</>}
+            </p>
+          </div>
+        </section>
+        <section className="bg-surface p-5 sm:p-6">
+          <h3 className="text-sm font-semibold text-ink">Cover letter</h3>
+          <div className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-surface-2 p-4 text-sm leading-6 text-ink/90">{item.cover_letter || "No cover letter preview available."}</div>
+        </section>
+      </div>
+
+      <div className="flex flex-col-reverse justify-end gap-2 border-t border-line p-4 sm:flex-row sm:px-6">
+        <Button variant="secondary" onClick={() => onDecide(item, "rejected")} disabled={working}>Reject</Button>
+        <Button onClick={() => onDecide(item, "approved")} disabled={working || !passed}>Approve resume</Button>
+      </div>
+    </article>
+  );
+}
 
 export default function Approvals({ userId, onDecided }) {
   const [items, setItems] = useState([]);
@@ -23,16 +123,10 @@ export default function Approvals({ userId, onDecided }) {
   };
   useEffect(() => {
     let active = true;
-    api.approvals(userId).then((approvals) => {
-      if (active) {
-        setItems(approvals);
-        setError("");
-      }
-    }).catch((e) => {
-      if (active) setError(`Could not load approvals: ${e.message}`);
-    }).finally(() => {
-      if (active) setLoading(false);
-    });
+    api.approvals(userId)
+      .then((approvals) => { if (active) { setItems(approvals); setError(""); } })
+      .catch((e) => { if (active) setError(`Could not load approvals: ${e.message}`); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [userId]);
 
@@ -44,8 +138,7 @@ export default function Approvals({ userId, onDecided }) {
       const result = await api.decide(item.approval_id, decision);
       await load();
       onDecided?.();
-      const bad = result.application_status === "needs_attention";
-      if (bad) setError(result.message || "This application needs attention.");
+      if (result.application_status === "needs_attention") setError(result.message || "This application needs attention.");
       else setMsg(result.message || `Decision saved. Status: ${result.application_status}.`);
     } catch (e) {
       setError(`Could not update approval: ${e.message}`);
@@ -60,75 +153,40 @@ export default function Approvals({ userId, onDecided }) {
     else decide(item, decision);
   };
 
-  if (loading) return <LoadingState label="Loading items that need your review..." />;
+  if (loading) return <LoadingState label="Loading items waiting for you..." />;
 
   return (
     <div className="space-y-6">
-      <div><p className="text-sm font-medium text-[#5F6368]">Your decision matters</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#202124] sm:text-3xl">Approvals</h1><p className="mt-2 text-sm text-[#5F6368]">Review every document and submission before it leaves your account.</p></div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Approvals</h1>
+        <p className="mt-2 max-w-xl text-sm text-muted">
+          {items.length ? `${items.length} waiting. ApplyPilot won't send anything until you've approved it here.` : "ApplyPilot won't send anything until you've approved it here."}
+        </p>
+      </div>
+
       <StatusMessage message={error || msg} error={!!error} />
-      {busy && <div className="rounded-xl bg-[#E8F0FE] px-4 py-3 text-sm text-[#0B57D0]">Working on it. Submitting to a real website can take up to a minute, please wait...</div>}
-      {items.length === 0 && !error ? <EmptyState title="All caught up" description="New documents and application submissions will appear here for your review." /> : (
+      {busy && <div role="status" className="rounded-xl bg-brand-bg px-4 py-3 text-sm text-brand">Working on it. Submitting to a real website can take up to a minute.</div>}
+
+      {items.length === 0 && !error ? (
+        <EmptyState title="Nothing to review" description="When a resume is ready or a form has been filled, it shows up here." />
+      ) : (
         <div className="space-y-5">
-          {items.map((item) => item.kind === "submission" ? (
-            <article key={item.approval_id} className="overflow-hidden rounded-2xl border border-[#F9AB00]/60 bg-white shadow-sm">
-              <div className="flex items-start gap-3 bg-[#FEF7E0] px-5 py-4 sm:px-6">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#8D5B00]" />
-                <div><p className="font-semibold text-[#5F4300]">Final review before submission</p><p className="mt-1 text-sm text-[#6B5A2E]">Nothing is sent or submitted until you approve this step.</p></div>
-              </div>
-              <div className="space-y-5 p-5 sm:p-6">
-                <div><h2 className="text-lg font-semibold text-[#202124]">{item.role || "Role not specified"}</h2><p className="text-sm text-[#5F6368]">{item.company || "Company not specified"}</p></div>
-                {item.method !== "email" && (
-                  <div className="overflow-hidden rounded-xl border border-[#DADCE0] bg-[#F8F9FA]">
-                    <div className="flex items-center gap-2 border-b border-[#DADCE0] px-4 py-3 text-sm font-medium text-[#444746]"><FileText className="h-4 w-4" />Filled application preview</div>
-                    <img src={`${api.screenshotUrl(item.application_id)}&t=${item.approval_id}`} alt="Preview of the filled application form" crossOrigin="use-credentials" className="max-h-[480px] w-full object-contain object-top" />
-                  </div>
-                )}
-                {!!item.preview?.length && <div className="overflow-hidden rounded-xl border border-[#DADCE0]">
-                  <div className="border-b border-[#E8EAED] bg-[#F8F9FA] px-4 py-3 text-sm font-medium text-[#444746]">Submission details</div>
-                  <dl className="divide-y divide-[#E8EAED]">
-                    {item.preview.map((preview, index) => <div key={`${preview.label}-${index}`} className="grid gap-1 px-4 py-3 sm:grid-cols-[150px_1fr]"><dt className="text-sm text-[#5F6368]">{preview.label}</dt><dd className="break-words whitespace-pre-wrap text-sm text-[#202124]">{preview.value}</dd></div>)}
-                  </dl>
-                </div>}
-                <p className="rounded-xl bg-[#FEF7E0] px-4 py-3 text-sm leading-6 text-[#6B5A2E]">{item.method === "email" ? "Approving sends this application email from your connected Gmail account." : "Approving submits the filled form to the company."} Please review the details above before proceeding.</p>
-                <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
-                  <button onClick={() => requestDecision(item, "rejected")} disabled={busy === item.approval_id} className="rounded-full border border-[#DADCE0] px-5 py-2.5 text-sm font-semibold text-[#444746] hover:bg-[#F1F3F4] disabled:opacity-50">Cancel submission</button>
-                  <button onClick={() => requestDecision(item, "approved")} disabled={busy === item.approval_id} className="rounded-full bg-[#188038] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#137333] disabled:opacity-50">{item.method === "email" ? "Approve & send email" : "Approve & submit"}</button>
-                </div>
-              </div>
-            </article>
-          ) : (
-            <article key={item.approval_id} className="rounded-2xl border border-[#DADCE0] bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div><p className="text-xs font-semibold uppercase tracking-wide text-[#5F6368]">Resume and cover letter review</p><h2 className="mt-1 text-lg font-semibold text-[#202124]">{item.role || "Role not specified"}</h2><p className="text-sm text-[#5F6368]">{item.company || "Company not specified"}</p></div>
-                <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${item.fact_check?.passed ? "bg-[#E6F4EA] text-[#137333]" : "bg-[#FCE8E6] text-[#B3261E]"}`}>
-                  <ShieldCheck className="h-4 w-4" />{item.fact_check?.passed ? "Fact check passed" : "Fact check failed"}
-                </span>
-              </div>
-              {!item.fact_check?.passed && <div className="mt-4 rounded-xl bg-[#FCE8E6] p-4 text-sm text-[#B3261E]"><p className="font-semibold">Resolve these fact-check issues before approval:</p><ul className="mt-2 list-disc space-y-1 pl-5">{(item.fact_check?.issues || []).map((issue, index) => <li key={index}>{issue}</li>)}</ul></div>}
-              <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                <section className="rounded-xl border border-[#DADCE0] p-4">
-                  <h3 className="font-semibold text-[#202124]">Resume files</h3>
-                  <p className="mt-1 text-sm text-[#5F6368]">Preview or download your generated resume.</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <a className="rounded-full border border-[#DADCE0] px-4 py-2 text-sm font-medium text-[#0B57D0] hover:bg-[#E8F0FE]" href={api.fileUrl(item.application_id, "pdf")} target="_blank" rel="noreferrer">Preview / download PDF</a>
-                    <a className="rounded-full border border-[#DADCE0] px-4 py-2 text-sm font-medium text-[#0B57D0] hover:bg-[#E8F0FE]" href={api.fileUrl(item.application_id, "docx")} target="_blank" rel="noreferrer">Download DOCX</a>
-                  </div>
-                </section>
-                <section className="rounded-xl border border-[#DADCE0] p-4">
-                  <h3 className="font-semibold text-[#202124]">Tailored cover letter</h3>
-                  <div className="mt-3 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-lg bg-[#F8F9FA] p-4 text-sm leading-6 text-[#444746]">{item.cover_letter || "No cover letter preview available."}</div>
-                </section>
-              </div>
-              <div className="mt-4 rounded-xl bg-[#F6F8FC] p-4 text-sm text-[#5F6368]"><span className="font-semibold text-[#202124]">Profile details used: </span>{(item.selected?.skills || []).join(", ") || "No selected skills"}{item.selected?.projects?.length > 0 && <> · Projects: {item.selected.projects.join(", ")}</>}</div>
-              <div className="mt-5 flex flex-col-reverse justify-end gap-2 sm:flex-row">
-                <button onClick={() => requestDecision(item, "rejected")} disabled={busy === item.approval_id} className="rounded-full border border-[#DADCE0] px-5 py-2.5 text-sm font-semibold text-[#444746] hover:bg-[#F1F3F4] disabled:opacity-50">Reject</button>
-                <button onClick={() => requestDecision(item, "approved")} disabled={busy === item.approval_id || !item.fact_check?.passed} className="rounded-full bg-[#0B57D0] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0842A0] disabled:cursor-not-allowed disabled:opacity-50">Approve resume</button>
-              </div>
-            </article>
-          ))}
+          {items.map((item) => item.kind === "submission"
+            ? <SubmissionReview key={item.approval_id} item={item} working={busy === item.approval_id} onDecide={requestDecision} />
+            : <ResumeReview key={item.approval_id} item={item} working={busy === item.approval_id} onDecide={requestDecision} />)}
         </div>
       )}
-      {confirmation && <ConfirmationModal title={confirmation.method === "email" ? "Send this application email?" : "Submit this application?"} description={confirmation.method === "email" ? "ApplyPilot will send the reviewed message and resume from your connected Gmail account. This action cannot be undone." : "ApplyPilot will submit the reviewed form to the employer. Please confirm that all visible details are correct."} confirmLabel={confirmation.method === "email" ? "Send email" : "Submit application"} onCancel={() => setConfirmation(null)} onConfirm={() => decide(confirmation, "approved")} busy={busy === confirmation.approval_id} />}
+
+      {confirmation && (
+        <ConfirmationModal
+          title={confirmation.method === "email" ? "Send this application email?" : "Submit this application?"}
+          description={confirmation.method === "email" ? "ApplyPilot will send the reviewed message and resume from your connected Gmail account. This can't be undone." : "ApplyPilot will submit the reviewed form to the employer. Check that every detail on screen is correct first."}
+          confirmLabel={confirmation.method === "email" ? "Send email" : "Submit application"}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => decide(confirmation, "approved")}
+          busy={busy === confirmation.approval_id}
+        />
+      )}
     </div>
   );
 }
